@@ -97,13 +97,14 @@ CMDP can replicate, while CMDP captures trajectory-level budget feasibility
 beyond any state-local filter. A worked example in Agentic Commerce
 illustrates the framework under partial observability and dynamic intent, and
 we analyze failure modes, RLHF comparisons, and open computational challenges.
+The analysis is theoretical; empirical validation remains an open direction.
 \end{abstract}
 
 \medskip
 \noindent\textbf{Keywords:} Intent-Constrained MDP (ICMDP), Markov Decision
-Processes, Constrained MDPs, Partially Observable MDPs, Intent Constraints,
-Agentic Commerce, Large Language Models, AI Alignment, Safe Reinforcement
-Learning.
+Processes, Constrained MDPs, Partially Observable MDPs, Action Masking,
+Autonomous Agents, Agentic Commerce, Large Language Models, AI Alignment,
+Safe Reinforcement Learning.
 
 % -----------------------------------------------------------------------
 \section{Introduction}
@@ -202,6 +203,15 @@ demonstrating that sequence models can support structured multi-step planning.
 Foundational work on the attention mechanism underlying modern LLMs is due to
 \citet{vaswani2017}.
 
+\paragraph{Concurrent and related work on LLM-guided action masking.}
+\citet{camel2025} propose CAMEL, which uses LLM outputs to dynamically
+mask the action space during reinforcement learning training via an
+epsilon-masking schedule that gradually reduces reliance on the LLM guide.
+\citet{cotconstraints2024} introduce Constraints-of-Thought, which restricts
+the feasible action set during LLM-guided planning by injecting executable
+constraints that prune search expansions. Both works are closely related to
+the ICMDP construction.
+
 \paragraph{Positioning of this work.}
 To our knowledge, this work is among the first to formalize intent as a
 state-dependent hard constraint on the admissible action space within an
@@ -211,7 +221,13 @@ $\cI(s) \subseteq \cA$ that enforces per-step admissibility
 rather than expectation-based penalties; an LLM acting as a probabilistic
 intent parser that grounds natural-language instructions in a formal
 constraint structure; and zero violation probability by construction, which
-expectation-based formulations cannot guarantee.
+expectation-based formulations cannot guarantee. Unlike CAMEL, which uses
+LLM masking as a training-time exploration heuristic, ICMDP enforces
+$\cI(s)$ as a hard runtime admissibility constraint at every execution step,
+with formal Bellman analysis and an expressiveness incomparability result
+(Proposition~\ref{prop:strict_generalization}). Unlike Constraints-of-Thought,
+which operates over LLM search expansions, ICMDP is grounded in the standard
+MDP formalism and admits policy-theoretic guarantees.
 
 % -----------------------------------------------------------------------
 \section{Mathematical Framework}
@@ -406,6 +422,12 @@ $\cI : \cS \to 2^{\cA}$ is the \emph{intent-constraint function} that maps
 each state to the set of \emph{intent-admissible} actions.
 \end{definition}
 
+\begin{remark}[Notation]
+The two notations $\cI : \cS \to 2^{\cA}$ and $\cI(s) \subseteq \cA$ are
+equivalent and used interchangeably: the former emphasises the functional
+type, the latter the value at a specific state.
+\end{remark}
+
 The ICMDP imposes a \emph{hard admissibility condition} on every policy:
 \begin{equation}
   \pi(a \given s) = 0 \quad \forall\, a \notin \cI(s),\; \forall\, s \in \cS.
@@ -444,8 +466,24 @@ with the corresponding optimal intent-constrained policy
   \label{eq:icmdp_optpol}
 \end{equation}
 
-\begin{remark}[Reduction to MDP]
+The corresponding \emph{intent-constrained action-value function} is
+\begin{equation}
+  Q_\cI^*(s,a) = R(s,a) + \gamma \sum_{s' \in \cS}
+    \cP(s' \given s, a)\, V_\cI^*(s'),
+    \quad a \in \cA_\cI(s),
+  \label{eq:icmdp_qfunc}
+\end{equation}
+so that $V_\cI^*(s) = \max_{a \in \cA_\cI(s)} Q_\cI^*(s,a)$ and
+$\pi_\cI^*(s) = \argmax_{a \in \cA_\cI(s)} Q_\cI^*(s,a)$.
+The model-free update rule in Section~\ref{subsec:solutions} estimates
+$Q_\cI^*$ directly from sampled transitions.
+
+\begin{remark}[Reduction to MDP and CMDP]
 When $\cI(s) = \cA$ for all $s$, the ICMDP reduces to a standard MDP.
+When $\cI(s) = \cA$ for all $s$ and expectation-based cost constraints are
+added, the problem reduces to a CMDP, placing MDP $\subset$ CMDP and
+MDP $\subset$ ICMDP at the base of the hierarchy, with ICMDP and CMDP
+expressively incomparable above it (Proposition~\ref{prop:strict_generalization}).
 \end{remark}
 
 \subsection{Feasibility and Infeasibility}
@@ -485,13 +523,15 @@ cannot be represented as any ICMDP admissible policy class.
 
 \begin{proof}[Proof sketch]
 (\emph{ICMDP $\not\subseteq$ CMDP}.)
+We assume throughout that CMDP cost functions are bounded: $C_k(s,a) < \infty$
+for all $s,a,k$ — the standard assumption in the literature
+\citep{altman1999,achiam2017cpo}.
 Consider the intent \enquote{\emph{never select action $a^-$ in state $s^+$}},
 encoded as $\cI(s^+) = \cA \setminus \{a^-\}$, so $\Pi_\cI$ contains only
-policies with $\pi(a^- \given s^+) = 0$. No CMDP with finite multipliers
-$\lambda_k$ can enforce this via~\eqref{eq:lagrangian}: because CMDP
-constraints are expectation-based, the Lagrangian assigns finite penalty to
-selecting $a^-$ once, so the CMDP-optimal policy may place nonzero probability
-on $a^-$ in $s^+$.
+policies with $\pi(a^- \given s^+) = 0$. Under bounded costs, no CMDP with
+finite multipliers $\lambda_k$ can enforce this via~\eqref{eq:lagrangian}:
+the Lagrangian assigns a finite penalty to selecting $a^-$ once, so the
+CMDP-optimal policy may place nonzero probability on $a^-$ in $s^+$.
 
 (\emph{CMDP $\not\subseteq$ ICMDP}.)
 Consider a CMDP constraint $\E_\pi\!\left[\sum_{t=0}^{\infty} \gamma^t
@@ -574,15 +614,20 @@ guaranteed by construction of the policy class $\Pi_\cI$.
 
 \subsubsection{Model-Free RL with Action Masking}
 In model-free settings, ICMDP can be implemented via action masking in Q-learning
-and policy gradient algorithms \citep{huang2022}.
+and policy gradient algorithms \citep{huang2022}. We note that
+\citet{huang2022} study masking of \emph{physically impossible} actions
+(those unavailable in the environment), whereas ICMDP masks
+\emph{normatively inadmissible} actions---actions that are environmentally
+possible but excluded by the user's intent constraint. The masking mechanism
+is identical in both cases; only the source of the mask differs.
 
 Let $\mathcal{M}(s,a)$ denote the action masking function, where $\mathcal{M}(s,a) = 1$ 
 if $a \in \cA_\cI(s)$ and $\mathcal{M}(s,a) = 0$ otherwise.
 
-Then the Q-learning update rule can be modified as
+The Q-learning update estimating $Q_\cI^*$~\eqref{eq:icmdp_qfunc} is:
 \begin{equation}
-  Q(s,a) \leftarrow Q(s,a) + \alpha\!\left[R(s,a)
-    + \gamma \max_{a' \in \cA_\cI(s')} Q(s',a') - Q(s,a)\right],
+  Q_\cI(s,a) \leftarrow Q_\cI(s,a) + \alpha\!\left[R(s,a)
+    + \gamma \max_{a' \in \cA_\cI(s')} Q_\cI(s',a') - Q_\cI(s,a)\right],
   \quad a \in \cA_\cI(s).
 \end{equation}
 
@@ -728,7 +773,10 @@ $(p_{\text{ask}}, \text{inv}, \text{eco}, \text{rep})$, where $p_{\text{ask}}$
 is the seller's posted ask price, $\text{inv} \in \{0,1\}$ indicates
 availability, $\text{eco} \in \{0,1\}$ encodes carbon-neutrality
 certification, and $\text{rep} \in [0,1]$ is the seller's verifiable
-reputation score.
+reputation score. Although $p_{\text{ask}}$ is naturally continuous, we
+discretize it into a finite set of price bins to satisfy the finite-state
+assumption of Definition~\ref{def:icmdp}; this is a standard simplification
+in applied MDP modeling.
 
 The action space $\cA$ includes: \textsc{Query}($v$), \textsc{Bid}($v, p$),
 \textsc{Accept}($v$), \textsc{Reject}($v$), and \textsc{Pay}($v, \text{rail}$)
@@ -854,7 +902,7 @@ RLHF, CMDP, and ICMDP.
     Intent representation  & Implicit ($\hat{R}_\phi$) & Cost thresholds & $\cI(s)$ function \\
     Violation guarantee    & None (statistical) & In expectation & Zero (per step) \\
     Qualitative intent     & Approximate & Limited & Full \\
-    Computational cost     & Training-time & Policy optimization & + LLM inference \\
+    Computational cost     & Training-time & Policy opt.\ + Lagrangian tuning & Policy opt.\ + LLM inference \\
     Verifiability          & Low & Moderate & High \\
     \bottomrule
   \end{tabular}
