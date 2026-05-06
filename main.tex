@@ -16,6 +16,7 @@
 \usepackage{microtype}
 \usepackage{xcolor}
 \usepackage{enumitem}
+\usepackage{csquotes}
 
 % -----------------------------------------------------------------------
 %  Theorem environments
@@ -138,8 +139,8 @@ MDP formalism does not adequately address:
 The rise of Large Language Models (LLMs) as the interface layer between humans
 and agentic systems makes the third challenge particularly pressing. An agent
 executing autonomous purchases on behalf of a user (an instance of
-\emph{Agentic Commerce}) must interpret intent such as \emph{"buy me the
-cheapest carbon-neutral option within my $\$100$ budget"} and translate it into
+\emph{Agentic Commerce}) must interpret intent such as \enquote{\emph{buy me the
+cheapest carbon-neutral option within my $\$100$ budget}} and translate it into
 a formal decision policy---all while operating under stochastic market
 conditions.
 
@@ -323,9 +324,9 @@ minimum price a vendor will accept, actual inventory levels, and the user's
 implicit urgency or budget. The agent receives observations $\mathcal{O}$ such
 as public price listings, historical bid patterns, and stock-out signals. The
 belief state $b$ is therefore the agent's probabilistic model of the market:
-for example, \emph{"there is a 60\% probability this vendor will drop its
+for example, \enquote{\emph{there is a 60\% probability this vendor will drop its
 price by 5\% within two hours, but a 40\% risk the item sells out before
-then."}
+then.}}
 
 While the POMDP provides a principled model of uncertainty, solving it exactly
 is PSPACE-hard \citep{kaelbling1998}. The computational burden is exacerbated
@@ -384,8 +385,8 @@ uncertainty while constraints provide hard operational boundaries.
 A critical limitation of CMDP, however, is that constraints are enforced only
 \emph{in expectation}. The agent may occasionally violate a constraint provided
 the long-run average remains below the threshold. This is insufficient for
-qualitative intent specifications such as \emph{"never transact with an
-unverified seller"}, which admit no violations at all.
+qualitative intent specifications such as \enquote{\emph{never transact with an
+unverified seller}}, which admit no violations at all.
 
 % -----------------------------------------------------------------------
 \section{The Intent-Constrained MDP (ICMDP)}
@@ -484,7 +485,7 @@ cannot be represented as any ICMDP admissible policy class.
 
 \begin{proof}[Proof sketch]
 (\emph{ICMDP $\not\subseteq$ CMDP}.)
-Consider the intent \emph{"never select action $a^-$ in state $s^+$"},
+Consider the intent \enquote{\emph{never select action $a^-$ in state $s^+$}},
 encoded as $\cI(s^+) = \cA \setminus \{a^-\}$, so $\Pi_\cI$ contains only
 policies with $\pi(a^- \given s^+) = 0$. No CMDP with finite multipliers
 $\lambda_k$ can enforce this via~\eqref{eq:lagrangian}: because CMDP
@@ -682,9 +683,9 @@ optimization.
 % -----------------------------------------------------------------------
 
 We illustrate the ICMDP framework with a concrete Agentic Commerce scenario: a
-user instructs an AI agent, via a conversational interface, to \emph{"Purchase
+user instructs an AI agent, via a conversational interface, to \enquote{\emph{Purchase
 100 units of Product X from a carbon-neutral supplier, spending no more than
-\$500, and completing the transaction within 60 seconds."} The agent must
+\$500, and completing the transaction within 60 seconds.}} The agent must
 autonomously search product catalogs, evaluate suppliers, negotiate terms, and
 execute payment, all without further user intervention.
 
@@ -829,8 +830,8 @@ ICMDP enforces admissibility at every step:
   \label{eq:icmdp_constraint}
 \end{equation}
 Condition~\eqref{eq:icmdp_constraint} captures qualitative intent
-specifications---such as \emph{"only interact with verified sellers"}
-or \emph{"avoid environmentally harmful options"}---that cannot be enforced
+specifications---such as \enquote{\emph{only interact with verified sellers}}
+or \enquote{\emph{avoid environmentally harmful options}}---that cannot be enforced
 by any CMDP with finite multipliers. Conversely, trajectory-level
 budget constraints expressible in CMDP have no equivalent state-local
 representation in ICMDP. Proposition~\ref{prop:strict_generalization}
