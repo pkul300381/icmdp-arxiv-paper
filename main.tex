@@ -54,8 +54,8 @@
 Using Markov Decision Processes with Intent Constraints}}
 
 \author{Parag Kulkarni\\[4pt]
-  \small Independent Researcher\\
-  \small \texttt{pkul3003@gmail.com}
+  \small Opus Technologies\\
+  \small \texttt{parag.kulkarni@opustechglobal.com}
 }
 
 \date{April 2026}
@@ -90,27 +90,19 @@ Large Language Models (LLMs) as probabilistic intent parsers, translating
 natural language instructions into structured constraint functions that govern
 agent behavior.
 
-Through theoretical analysis, we demonstrate that ICMDP constitutes a strict
-generalization of CMDP, enabling the representation of policies that cannot be
-captured through expectation-based constraints alone. A worked example in
-Agentic Commerce illustrates the framework applied to multi-agent interactions,
-partial observability, and dynamic environments. We also examine key
-distinctions between ICMDP and RLHF, identify potential failure
-modes---including intent misinterpretation and feasibility collapse---and
-discuss open challenges related to computational complexity and dynamic intent
-adaptation.
-
-Our findings suggest that incorporating explicit intent constraints into
-decision-theoretic models provides a more expressive and formally verifiable
-foundation for designing autonomous systems that are both performant and aligned
-with user expectations, offering a promising direction for safe and verifiable
-AI-driven decision-making.
+Through theoretical analysis, we show that ICMDP and CMDP are expressively
+incomparable: ICMDP enforces zero-violation per-step admissibility that no
+CMDP can replicate, while CMDP captures trajectory-level budget feasibility
+beyond any state-local filter. A worked example in Agentic Commerce
+illustrates the framework under partial observability and dynamic intent, and
+we analyze failure modes, RLHF comparisons, and open computational challenges.
 \end{abstract}
 
 \medskip
-\noindent\textbf{Keywords:} Markov Decision Processes, Constrained MDPs,
-Partially Observable MDPs, Intent Constraints, Agentic Commerce, Large Language
-Models, AI Alignment, Safe Reinforcement Learning.
+\noindent\textbf{Keywords:} Intent-Constrained MDP (ICMDP), Markov Decision
+Processes, Constrained MDPs, Partially Observable MDPs, Intent Constraints,
+Agentic Commerce, Large Language Models, AI Alignment, Safe Reinforcement
+Learning.
 
 % -----------------------------------------------------------------------
 \section{Introduction}
@@ -210,11 +202,15 @@ Foundational work on the attention mechanism underlying modern LLMs is due to
 \citet{vaswani2017}.
 
 \paragraph{Positioning of this work.}
-To our knowledge, this paper is the first to formally define a
-\emph{hard-constraint} intent layer directly within the MDP transition
-structure---as opposed to encoding intent through reward shaping (RLHF) or
-soft cost penalties (CMDP)---and to characterize the expressiveness gain this
-yields.
+To our knowledge, this work is among the first to formalize intent as a
+state-dependent hard constraint on the admissible action space within an
+MDP---which we term an \emph{Intent-Constrained MDP} (ICMDP). The
+distinguishing features are: a state-dependent filter
+$\cI(s) \subseteq \cA$ that enforces per-step admissibility
+rather than expectation-based penalties; an LLM acting as a probabilistic
+intent parser that grounds natural-language instructions in a formal
+constraint structure; and zero violation probability by construction, which
+expectation-based formulations cannot guarantee.
 
 % -----------------------------------------------------------------------
 \section{Mathematical Framework}
@@ -260,6 +256,25 @@ The corresponding optimal policy is
     \sum_{s' \in \cS} \cP(s' \given s, a)\, V^*(s')\right].
   \label{eq:optpol}
 \end{equation}
+
+The \emph{action-value function} (Q-function) $Q^\pi : \cS \times \cA \to \R$
+provides a per-action decomposition of the value function:
+\begin{equation}
+  Q^\pi(s,a) = R(s,a) + \gamma \sum_{s' \in \cS}
+    \cP(s' \given s, a)\, V^\pi(s').
+  \label{eq:qfunc}
+\end{equation}
+The optimal Q-function satisfies the \emph{Q-learning Bellman equation}:
+\begin{equation}
+  Q^*(s,a) = R(s,a) + \gamma \sum_{s' \in \cS}
+    \cP(s' \given s, a)\max_{a' \in \cA} Q^*(s', a'),
+  \label{eq:qbellman}
+\end{equation}
+with $V^*(s) = \max_{a \in \cA} Q^*(s,a)$ and
+$\pi^*(s) = \argmax_{a \in \cA} Q^*(s,a)$.
+Equation~\eqref{eq:qbellman} is the basis for model-free Q-learning
+algorithms \citep{sutton2018}, which estimate $Q^*$ from sampled transitions
+without requiring explicit knowledge of $\cP$.
 
 While elegant, the MDP formulation assumes full state observability, imposes
 no operational constraints, and encodes the entire objective within the scalar
@@ -412,6 +427,7 @@ The \emph{admissible policy class} is
 \end{equation}
 
 \subsection{ICMDP Bellman Equations}
+\label{subsec:icmdp_bellman}
 
 The optimal ICMDP value function satisfies the \emph{intent-constrained Bellman
 optimality equation}:
@@ -439,6 +455,7 @@ A fundamental precondition for meaningful policy optimization under ICMDP is
 every reachable state.
 
 \begin{definition}[Intent Feasibility]
+\label{def:feasibility}
 An ICMDP $\cM_I$ is \emph{intent-feasible} if and only if
 \begin{equation}
   \cA_\cI(s) \neq \emptyset \quad \forall\, s \in \cS.
@@ -459,26 +476,32 @@ classical CMDPs.
 
 \begin{proposition}
 \label{prop:strict_generalization}
-ICMDP is a strict generalization of CMDP: every CMDP-feasible policy set can
-be expressed as an ICMDP admissible policy class, but the converse does not
-hold in general.
+ICMDP and CMDP are \emph{expressively incomparable}: there exist
+intent-admissible policy classes $\Pi_\cI$ that cannot be represented as the
+feasible set of any CMDP, and there exist CMDP-feasible policy sets that
+cannot be represented as any ICMDP admissible policy class.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-(\emph{CMDP $\subseteq$ ICMDP expressiveness}.)
-Given a CMDP with constraint functions $\{C_k\}$ and thresholds $\{d_k\}$, one
-can define $\cI(s) = \cA$ for all $s$ and encode the cost constraints via the
-Lagrangian~\eqref{eq:lagrangian}, recovering CMDP as a special case.
+(\emph{ICMDP $\not\subseteq$ CMDP}.)
+Consider the intent \emph{"never select action $a^-$ in state $s^+$"},
+encoded as $\cI(s^+) = \cA \setminus \{a^-\}$, so $\Pi_\cI$ contains only
+policies with $\pi(a^- \given s^+) = 0$. No CMDP with finite multipliers
+$\lambda_k$ can enforce this via~\eqref{eq:lagrangian}: because CMDP
+constraints are expectation-based, the Lagrangian assigns finite penalty to
+selecting $a^-$ once, so the CMDP-optimal policy may place nonzero probability
+on $a^-$ in $s^+$.
 
-(\emph{Strict containment}.)
-Consider an intent specification of the form \emph{"never select action $a^-$
-in state $s^+$"}, i.e., $\cI(s^+) = \cA \setminus \{a^-\}$. This enforces
-$\pi(a^- \given s^+) = 0$ exactly. No CMDP cost function can equivalently
-enforce this condition because CMDP constraints are expectation-based: for any
-finite $\lambda_k$, the Lagrangian~\eqref{eq:lagrangian} does not assign
-infinite penalty to a single action taken once. Hence the CMDP-optimal policy
-may assign nonzero probability to $a^-$ in $s^+$, which violates the intent
-constraint. $\square$
+(\emph{CMDP $\not\subseteq$ ICMDP}.)
+Consider a CMDP constraint $\E_\pi\!\left[\sum_{t=0}^{\infty} \gamma^t
+C(s_t, a_t)\right] \leq d$ for a cost function $C > 0$ everywhere.
+The CMDP-feasible set is determined by the entire trajectory distribution:
+whether action $a$ is permissible in state $s$ depends on the cumulative costs
+incurred in all other states. No state-dependent filter
+$\cI : \cS \to 2^{\cA}$ can capture this trajectory-level dependency, because
+$\cI(s)$ is fixed regardless of the history of costs accumulated along the
+path to $s$. Hence the CMDP-feasible policy set cannot in general be expressed
+as any $\Pi_\cI$. $\square$
 \end{proof}
 
 \subsection{Dynamic Intent}
@@ -498,10 +521,99 @@ ICMDP framework accommodates two responses:
   full model retraining.
   \item \textbf{Feasibility alerts}: Proactive notification when market
   conditions render current intent constraints infeasible
-  (Definition~\ref{def:icmdp}).
+  (Definition~\ref{def:feasibility}).
 \end{enumerate}
 Efficient online algorithms for dynamically reconfigured ICMDPs remain an open
-research problem.
+research problem. The next section presents solution methods for ICMDP.
+
+\subsection{Solutions for ICMDP}
+\label{subsec:solutions}
+The ICMDP formulation modifies the feasible action space rather than the reward 
+or cost structure. As a result, standard dynamic programming and reinforcement 
+learning algorithms can be adapted to operate over the intent-restricted action set
+$\cA_\cI(s)$. This yields a class of solution methods that we refer to as 
+intent-filtered optimization, in which infeasible actions are 
+pruned prior to policy evaluation and improvement.
+
+\subsubsection{Intent-Constrained Value Iteration}
+The Bellman optimality update for ICMDP~\eqref{eq:icmdp_bellman} can be implemented via a straightforward
+modification of classical value iteration:
+
+\begin{equation}
+  V_{k+1}(s) = \max_{a \in \cA_\cI(s)}\left[R(s,a) + \gamma 
+  \sum_{s' \in \cS} \cP(s' \given s, a)\, V_k(s')\right].
+  \label{eq:intent_vk}
+\end{equation}
+
+The only modification relative to standard MDP value iteration is the restriction
+of the maximization operator to the admissible set $\cA_\cI(s)$. This is equivalent
+to state-dependent action masking applied prior to the Bellman backup
+\citep{huang2022}.
+
+Additionally, the per-iteration computation complexity reduces from $O(|\cS||\cA|)$ to 
+$O(|\cS||\cA_\cI(s)|)$, which can generate efficiency gains when the intent 
+constraints are sufficiently restrictive.
+
+\subsubsection{Policy Iteration under Admissibility Constraints}
+
+Policy iteration can be adapted by constraining both policy evaluation and improvement steps.
+\begin{itemize}
+    \item Policy Evaluation: The evaluation does not change, but it is applied to an admissible policy
+    $\pi \in \Pi_\cI$.
+
+    \item Policy Improvement:
+           \begin{equation}
+             \pi_{k+1}(s) = \argmax_{a \in \cA_\cI(s)} Q^{\pi_k}(s,a)
+             \quad \forall\, s \in \cS.
+           \end{equation}
+\end{itemize}
+
+Unlike CMDPs, no Lagrangian relaxation is required; constraint satisfaction is
+guaranteed by construction of the policy class $\Pi_\cI$.
+
+\subsubsection{Model-Free RL with Action Masking}
+In model-free settings, ICMDP can be implemented via action masking in Q-learning
+and policy gradient algorithms \citep{huang2022}.
+
+Let $\mathcal{M}(s,a)$ denote the action masking function, where $\mathcal{M}(s,a) = 1$ 
+if $a \in \cA_\cI(s)$ and $\mathcal{M}(s,a) = 0$ otherwise.
+
+Then the Q-learning update rule can be modified as
+\begin{equation}
+  Q(s,a) \leftarrow Q(s,a) + \alpha\!\left[R(s,a)
+    + \gamma \max_{a' \in \cA_\cI(s')} Q(s',a') - Q(s,a)\right],
+  \quad a \in \cA_\cI(s).
+\end{equation}
+
+For policy gradient, the policy can be parameterized as
+
+\begin{equation}
+  \pi_\theta(a \given s) = \frac{\exp(Q(s,a))}{\sum_{a' \in \cA_\cI(s)} \exp(Q(s,a'))}
+\end{equation}
+
+where $Q(s,a)$ is the action-value function of a Deep Q-Network (DQN)
+\citep{mnih2015}.
+
+This ensures zero probability mass is assigned to inadmissible actions at all times, 
+enforcing hard constraint satisfaction during both training and execution. 
+
+\subsubsection{Feasibility Aware Planning}
+
+A critical requirement for all solution methods is intent feasibility (Definition~\ref{def:feasibility}).
+In practice, algorithms must incorporate feasibility checks:
+
+\begin{itemize}
+    \item If $\cA_\cI(s) = \emptyset$, the system must trigger constraint relaxation or a fallback policy.
+    \item Maintain a feasibility monitor during planning and execution.
+\end{itemize}
+
+\subsubsection{Comparison to CMDP solvers}
+
+Unlike CMDP solution methods, which rely on Lagrangian dual optimization and may require 
+iterative tuning of multipliers, ICMDP eliminates constraint violations by restricting 
+the policy space a priori. This removes the need for saddle-point optimization but 
+introduces sensitivity to constraint specification and feasibility.
+
 
 % -----------------------------------------------------------------------
 \section{LLM as Probabilistic Intent Parser}
@@ -712,12 +824,13 @@ ICMDP enforces admissibility at every step:
   \pi(a \given s) = 0 \quad \forall\, a \notin \cI(s),\; \forall\, s.
   \label{eq:icmdp_constraint}
 \end{equation}
-Condition~\eqref{eq:icmdp_constraint} is a strictly stronger requirement than
-\eqref{eq:cmdp_constraint}, enabling formal representation of qualitative
-intent specifications---such as \emph{"only interact with verified sellers"}
-or \emph{"avoid environmentally harmful options"}---which are difficult to
-encode as scalar cost functions. Proposition~\ref{prop:strict_generalization}
-formalizes this expressiveness gain.
+Condition~\eqref{eq:icmdp_constraint} captures qualitative intent
+specifications---such as \emph{"only interact with verified sellers"}
+or \emph{"avoid environmentally harmful options"}---that cannot be enforced
+by any CMDP with finite multipliers. Conversely, trajectory-level
+budget constraints expressible in CMDP have no equivalent state-local
+representation in ICMDP. Proposition~\ref{prop:strict_generalization}
+formalizes this expressiveness incomparability.
 
 \subsection{ICMDP vs.\ RLHF: Structural Distinctions}
 
@@ -780,36 +893,13 @@ systems. Caching, intent pre-compilation, and approximation strategies can
 mitigate this, but introduce trade-offs between accuracy, cost, and
 responsiveness.
 
-\subsection{Hypothesis Evaluation}
+\subsection{Limitations}
 
-The central hypothesis is whether the ICMDP framework provides a structurally
-distinct and more expressive model for representing user intent compared to
-CMDP.
-
-\begin{itemize}
-  \item \textbf{Null hypothesis $H_0$}: The inclusion of an intent constraint
-  set $\cI(s)$ does not add expressive power beyond CMDP.
-  \item \textbf{Alternative hypothesis $H_1$}: ICMDP, by incorporating a
-  state-dependent hard constraint $\cI(s)$ derived from natural language, is
-  strictly more expressive than CMDP and admits policies that cannot be fully
-  encoded by cost functions alone.
-\end{itemize}
-
-The theoretical analysis in this paper provides strong grounds to reject $H_0$.
-As established in Proposition~\ref{prop:strict_generalization}, CMDP enforces
-constraints only in expectation (cf.\ \eqref{eq:cmdp_constraint}), allowing
-occasional violations. ICMDP enforces a strictly stronger admissibility
-condition (cf.\ \eqref{eq:icmdp_constraint}) that eliminates entire classes of
-policies otherwise feasible under CMDP. Furthermore, ICMDP enables formal
-representation of qualitative intent that cannot be encoded as scalar cost
-functions.
-
-However, this evaluation is non-empirical. Several limitations remain: no
-quantitative policy performance comparison has been conducted; solver
-scalability has not been empirically tested; and real-world robustness under
-noisy intent extraction has not been evaluated. A definitive conclusion
-therefore requires empirical validation in practical environments, particularly
-in Agentic Commerce settings.
+The analysis in this paper is purely theoretical. No quantitative policy
+performance comparison has been conducted; solver scalability has not been
+empirically tested; and real-world robustness under noisy intent extraction
+has not been evaluated. Empirical validation in practical Agentic Commerce
+settings is necessary for a definitive conclusion.
 
 % -----------------------------------------------------------------------
 \section{Conclusion}
@@ -824,10 +914,11 @@ by introducing intent as a first-class mathematical constraint that directly
 governs the admissible action space, shifting the optimization paradigm from
 reward-driven maximization to intent-preserving decision processes.
 
-Through formal analysis, we have shown that ICMDP constitutes a strict
-generalization of CMDP (Proposition~\ref{prop:strict_generalization}),
-enabling the expression of policies that cannot be represented through
-expectation-based constraints alone. The worked Agentic Commerce example
+Through formal analysis, we have shown that ICMDP and CMDP are expressively
+incomparable (Proposition~\ref{prop:strict_generalization}): ICMDP admits
+policies that no CMDP can enforce via expectation-based constraints, while
+CMDP captures trajectory-level budget feasibility that no state-local intent
+filter can replicate. The worked Agentic Commerce example
 demonstrates architectural realizability and identifies the LLM-based intent
 parser as a principled, modular component that separates semantic
 interpretation from stochastic optimization.
