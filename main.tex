@@ -666,7 +666,7 @@ introduces sensitivity to constraint specification and feasibility.
 
 Section~\ref{sec:example} instantiates these solution methods concretely:
 the Agentic Commerce scenario maps intent-constrained value iteration to the
-product-catalog state space of Section~\ref{sec:example}, the masked
+product-catalog state space defined there, the masked
 Q-learning update~\eqref{eq:icmdp_qfunc} to the vendor bidding actions, and
 the masked softmax policy~\eqref{eq:masked_policy} to the LLM-derived
 admissibility function~\eqref{eq:example_intent}.
@@ -900,7 +900,8 @@ RLHF, CMDP, and ICMDP.
   \centering
   \caption{Comparison of alignment mechanisms.}
   \label{tab:comparison}
-  \begin{tabular}{lccc}
+  \small
+  \begin{tabular}{lp{2.8cm}p{3.4cm}p{2.8cm}}
     \toprule
     Property & RLHF & CMDP & ICMDP \\
     \midrule
