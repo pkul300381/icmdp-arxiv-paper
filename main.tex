@@ -58,7 +58,7 @@ Using Markov Decision Processes with Intent Constraints}}
   \small \texttt{parag.kulkarni@opustechglobal.com}
 }
 
-\date{April 2026}
+\date{May 2026}
 
 % -----------------------------------------------------------------------
 \begin{document}
@@ -585,17 +585,21 @@ Then the Q-learning update rule can be modified as
   \quad a \in \cA_\cI(s).
 \end{equation}
 
-For policy gradient, the policy can be parameterized as
-
+For policy gradient methods, the policy is parameterized via masked logits
+$z_\theta(s,a)$ output by a policy network:
 \begin{equation}
-  \pi_\theta(a \given s) = \frac{\exp(Q(s,a))}{\sum_{a' \in \cA_\cI(s)} \exp(Q(s,a'))}
+  \pi_\theta(a \given s) =
+  \begin{cases}
+    \dfrac{\exp\bigl(z_\theta(s,a)\bigr)}
+          {\displaystyle\sum_{a' \in \cA_\cI(s)} \exp\bigl(z_\theta(s,a')\bigr)}
+    & \text{if } a \in \cA_\cI(s), \\[8pt]
+    0 & \text{otherwise.}
+  \end{cases}
+  \label{eq:masked_policy}
 \end{equation}
-
-where $Q(s,a)$ is the action-value function of a Deep Q-Network (DQN)
-\citep{mnih2015}.
-
-This ensures zero probability mass is assigned to inadmissible actions at all times, 
-enforcing hard constraint satisfaction during both training and execution. 
+This is equivalent to setting logits of inadmissible actions to $-\infty$
+before the softmax, ensuring zero probability mass on inadmissible actions
+by construction \citep{huang2022}.
 
 \subsubsection{Feasibility Aware Planning}
 
