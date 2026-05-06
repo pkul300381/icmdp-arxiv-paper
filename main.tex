@@ -55,7 +55,7 @@
 Using Markov Decision Processes with Intent Constraints}}
 
 \author{Parag Kulkarni\\[4pt]
-  \small Opus Technologies\\
+  \small Opus Technologies \quad|\quad Lovely Professional University\\
   \small \texttt{parag.kulkarni@opustechglobal.com}
 }
 
@@ -659,11 +659,17 @@ In practice, algorithms must incorporate feasibility checks:
 
 \subsubsection{Comparison to CMDP solvers}
 
-Unlike CMDP solution methods, which rely on Lagrangian dual optimization and may require 
-iterative tuning of multipliers, ICMDP eliminates constraint violations by restricting 
-the policy space a priori. This removes the need for saddle-point optimization but 
+Unlike CMDP solution methods, which rely on Lagrangian dual optimization and may require
+iterative tuning of multipliers, ICMDP eliminates constraint violations by restricting
+the policy space a priori. This removes the need for saddle-point optimization but
 introduces sensitivity to constraint specification and feasibility.
 
+Section~\ref{sec:example} instantiates these solution methods concretely:
+the Agentic Commerce scenario maps intent-constrained value iteration to the
+product-catalog state space of Section~\ref{sec:example}, the masked
+Q-learning update~\eqref{eq:icmdp_qfunc} to the vendor bidding actions, and
+the masked softmax policy~\eqref{eq:masked_policy} to the LLM-derived
+admissibility function~\eqref{eq:example_intent}.
 
 % -----------------------------------------------------------------------
 \section{LLM as Probabilistic Intent Parser}
