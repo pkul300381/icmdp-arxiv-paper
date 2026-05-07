@@ -1,0 +1,468 @@
+\documentclass[12pt]{article}
+
+% -----------------------------------------------------------------------
+%  Packages
+% -----------------------------------------------------------------------
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{csquotes}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+
+% -----------------------------------------------------------------------
+%  Math macros (mirrors main.tex)
+% -----------------------------------------------------------------------
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cA}{\mathcal{A}}
+\newcommand{\cO}{\mathcal{O}}
+\newcommand{\cP}{\mathcal{P}}
+\newcommand{\cZ}{\mathcal{Z}}
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cI}{\mathcal{I}}
+\newcommand{\cM}{\mathcal{M}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\given}{\,\vert\,}
+\newcommand{\argmax}{\operatorname{arg\,max}}
+
+% algorithm2e style
+\SetKwInput{KwInput}{Input}
+\SetKwInput{KwOutput}{Output}
+\SetKwInput{KwParam}{Parameters}
+\SetKw{KwAnd}{and}
+\SetKw{KwOr}{or}
+\SetKwComment{Comment}{$\triangleright$\ }{}
+
+% -----------------------------------------------------------------------
+%  Metadata
+% -----------------------------------------------------------------------
+\title{\textbf{Algorithmic Specification for the\\
+Intent-Constrained MDP Framework}\\[6pt]
+\large Companion to: \emph{Mathematical Modeling of Autonomous Decision Agents
+Using Markov Decision Processes with Intent Constraints}}
+
+\author{Parag Kulkarni\\[4pt]
+  \small Opus Technologies \quad|\quad Lovely Professional University\\
+  \small \texttt{parag.kulkarni@opustechglobal.com}
+}
+
+\date{May 2026}
+
+% -----------------------------------------------------------------------
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This document provides formal algorithmic specifications for implementing
+the Intent-Constrained Markov Decision Process (ICMDP) framework in the
+context of Agentic Commerce. Seven algorithms are presented: LLM-based
+intent parsing, intent-constrained value iteration and policy iteration,
+masked Q-learning, masked policy gradient, real-time feasibility monitoring,
+and the full end-to-end Agentic Commerce pipeline integrating all components.
+Each algorithm is grounded in the formal definitions and equations of the
+companion paper.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% -----------------------------------------------------------------------
+\section{Overview}
+% -----------------------------------------------------------------------
+
+The ICMDP framework requires three interoperating components at runtime:
+\begin{enumerate}[leftmargin=*, label=(\roman*)]
+  \item An \textbf{intent parser} that maps natural language instructions
+  $l \in \cL$ and environment state $s \in \cS$ to an admissible action set
+  $\cA_\cI(s) \subseteq \cA$.
+  \item A \textbf{decision solver} that finds the optimal policy
+  $\pi_\cI^*$ over the intent-restricted action space.
+  \item A \textbf{feasibility monitor} that detects and handles the case
+  $\cA_\cI(s) = \emptyset$ before the solver is invoked.
+\end{enumerate}
+
+The algorithms in Sections~\ref{sec:intent-parser}--\ref{sec:feasibility}
+specify each component in isolation. Section~\ref{sec:pipeline} composes
+them into the full Agentic Commerce execution pipeline.
+
+% -----------------------------------------------------------------------
+\section{Intent Parsing}
+\label{sec:intent-parser}
+% -----------------------------------------------------------------------
+
+The intent parser $f_\theta : \cL \times \cS \to 2^{\cA}$ translates a
+natural language instruction into a formal admissibility function. In
+practice it is implemented as a structured LLM prompt that returns a set of
+predicate constraints which are then evaluated against each candidate action.
+
+\begin{algorithm}[H]
+\caption{LLM Intent Parser}
+\label{alg:intent-parser}
+\KwInput{Natural language instruction $l \in \cL$;\;
+         current state $s \in \cS$;\;
+         full action set $\cA$;\;
+         LLM with parameters $\theta$}
+\KwOutput{Intent-admissible action set $\cA_\cI(s)$}
+
+\BlankLine
+$\text{prompt} \leftarrow \textsc{BuildPrompt}(l,\, s,\, \cA)$
+\Comment*[r]{structured prompt requesting predicate constraints}
+
+$\mathbf{c} \leftarrow \textsc{LLMCall}_\theta(\text{prompt})$
+\Comment*[r]{$\mathbf{c} = \{c_1, \ldots, c_k\}$ formal predicates over actions}
+
+$\cA_\cI(s) \leftarrow \emptyset$\;
+
+\ForEach{$a \in \cA$}{
+  \If{$c_j(s, a) = \mathbf{true}$ \KwAnd for all $j = 1,\ldots,k$}{
+    $\cA_\cI(s) \leftarrow \cA_\cI(s) \cup \{a\}$\;
+  }
+}
+
+\BlankLine
+\textbf{return} $\cA_\cI(s)$\;
+\end{algorithm}
+
+\paragraph{Agentic Commerce instantiation.}
+For the procurement scenario, the instruction
+\enquote{\emph{Purchase 100 units from a carbon-neutral supplier, spending no
+more than \$500, within 60 seconds}}, the parser produces three predicates:
+$c_1$: $\text{eco}(v(a)) = 1$;\;
+$c_2$: $p(a) \leq 500$;\;
+$c_3$: $t_{\text{elapsed}} \leq 60\,\text{s}$.
+Any action violating at least one predicate is excluded from $\cA_\cI(s)$.
+
+% -----------------------------------------------------------------------
+\section{Feasibility Monitoring}
+\label{sec:feasibility}
+% -----------------------------------------------------------------------
+
+Before invoking any solver, the system must verify that the admissible set
+is non-empty in every reachable state. Algorithm~\ref{alg:feasibility}
+performs this check and escalates to constraint relaxation or user
+re-specification when necessary.
+
+\begin{algorithm}[H]
+\caption{Feasibility Monitor}
+\label{alg:feasibility}
+\KwInput{Current state $s$;\;
+         admissible set $\cA_\cI(s)$;\;
+         relaxation budget $\delta_{\max}$}
+\KwOutput{Feasible admissible set $\cA_\cI(s)$ or \textsc{Infeasible} signal}
+
+\BlankLine
+\If{$\cA_\cI(s) \neq \emptyset$}{
+  \textbf{return} $\cA_\cI(s)$\;
+}
+
+\Comment{Attempt progressive constraint relaxation}
+$\delta \leftarrow 0$\;
+\While{$\delta \leq \delta_{\max}$}{
+  $\cA_\cI^\delta(s) \leftarrow \textsc{RelaxConstraints}(\cI, s, \delta)$\;
+  \If{$\cA_\cI^\delta(s) \neq \emptyset$}{
+    $\textsc{NotifyUser}(\text{"Intent constraints relaxed by } \delta \text{"}$)\;
+    \textbf{return} $\cA_\cI^\delta(s)$\;
+  }
+  $\delta \leftarrow \delta + \Delta\delta$\;
+}
+
+\Comment{Relaxation budget exhausted — surface to user}
+$\textsc{ConstraintViolationWarning}(s, \cI)$\;
+\textbf{return} \textsc{Infeasible}\;
+\end{algorithm}
+
+% -----------------------------------------------------------------------
+\section{Planning Algorithms}
+\label{sec:planning}
+% -----------------------------------------------------------------------
+
+\subsection{Intent-Constrained Value Iteration}
+
+Algorithm~\ref{alg:icvi} is a direct adaptation of classical value
+iteration \citep{puterman1994} in which the Bellman backup operator is
+restricted to $\cA_\cI(s)$ at every state.
+
+\begin{algorithm}[H]
+\caption{Intent-Constrained Value Iteration (ICVI)}
+\label{alg:icvi}
+\KwInput{ICMDP $\cM_I = (\cS, \cA, \cP, R, \gamma, \cI)$;\;
+         convergence threshold $\varepsilon > 0$}
+\KwOutput{Optimal value function $V_\cI^*$;\; optimal policy $\pi_\cI^*$}
+\KwParam{$\gamma \in [0,1)$}
+
+\BlankLine
+Initialise $V_0(s) \leftarrow 0$ for all $s \in \cS$\;
+$k \leftarrow 0$\;
+
+\Repeat{$\|V_{k+1} - V_k\|_\infty < \varepsilon$}{
+  \ForEach{$s \in \cS$}{
+    $\cA_\cI(s) \leftarrow \textsc{FeasibilityMonitor}(s,\, \cI(s),\, \delta_{\max})$\;
+    \lIf{$\cA_\cI(s) = \textsc{Infeasible}$}{\textbf{halt} with infeasibility error}
+    $V_{k+1}(s) \leftarrow \displaystyle\max_{a \in \cA_\cI(s)}
+      \!\left[R(s,a) + \gamma \sum_{s'} \cP(s'\given s,a)\,V_k(s')\right]$\;
+  }
+  $k \leftarrow k + 1$\;
+}
+
+\ForEach{$s \in \cS$}{
+  $\pi_\cI^*(s) \leftarrow \displaystyle\argmax_{a \in \cA_\cI(s)}
+    \!\left[R(s,a) + \gamma \sum_{s'} \cP(s'\given s,a)\,V_\cI^*(s')\right]$\;
+}
+
+\textbf{return} $V_\cI^*,\; \pi_\cI^*$\;
+\end{algorithm}
+
+\subsection{Intent-Constrained Policy Iteration}
+
+Algorithm~\ref{alg:icpi} constrains both the policy evaluation and
+improvement steps to $\Pi_\cI$. No Lagrangian relaxation is required;
+admissibility is guaranteed by construction.
+
+\begin{algorithm}[H]
+\caption{Intent-Constrained Policy Iteration (ICPI)}
+\label{alg:icpi}
+\KwInput{ICMDP $\cM_I$;\; convergence threshold $\varepsilon > 0$}
+\KwOutput{Optimal admissible policy $\pi_\cI^*$}
+
+\BlankLine
+Initialise $\pi_0 \in \Pi_\cI$ arbitrarily
+\Comment*[r]{any admissible initial policy}
+$k \leftarrow 0$\;
+
+\Repeat{$\pi_{k+1} = \pi_k$}{
+
+  \Comment{--- Policy Evaluation ---}
+  Solve $(I - \gamma P^{\pi_k}) V^{\pi_k} = R^{\pi_k}$ for $V^{\pi_k}$\;
+  $Q_\cI^{\pi_k}(s,a) \leftarrow R(s,a) + \gamma \displaystyle\sum_{s'}
+    \cP(s'\given s,a)\,V^{\pi_k}(s')
+    \quad \forall s,\, a \in \cA_\cI(s)$\;
+
+  \Comment{--- Policy Improvement (intent-filtered) ---}
+  \ForEach{$s \in \cS$}{
+    $\pi_{k+1}(s) \leftarrow \argmax_{a \in \cA_\cI(s)}\, Q_\cI^{\pi_k}(s,a)$\;
+  }
+
+  $k \leftarrow k + 1$\;
+}
+
+\textbf{return} $\pi_\cI^* \leftarrow \pi_k$\;
+\end{algorithm}
+
+% -----------------------------------------------------------------------
+\section{Model-Free Reinforcement Learning}
+\label{sec:model-free}
+% -----------------------------------------------------------------------
+
+\subsection{Masked Q-Learning}
+
+Algorithm~\ref{alg:masked-q} estimates $Q_\cI^*$ from sampled transitions
+without requiring explicit knowledge of $\cP$. The only modification to
+standard Q-learning is that (i) updates are restricted to $a \in \cA_\cI(s)$
+and (ii) the bootstrap target takes the max over $\cA_\cI(s')$.
+
+\begin{algorithm}[H]
+\caption{Masked Q-Learning}
+\label{alg:masked-q}
+\KwInput{Environment with state space $\cS$, action space $\cA$;\;
+         intent-constraint function $\cI$;\;
+         number of episodes $N$;\;
+         episode horizon $T$}
+\KwOutput{Estimated $Q_\cI^*$}
+\KwParam{Learning rate $\alpha \in (0,1]$;\; discount $\gamma \in [0,1)$;\;
+          exploration rate $\epsilon > 0$}
+
+\BlankLine
+Initialise $Q_\cI(s,a) \leftarrow 0$ for all $s \in \cS,\, a \in \cA$\;
+
+\For{episode $= 1$ \KwTo $N$}{
+  Observe initial state $s_0$\;
+  \For{$t = 0$ \KwTo $T-1$}{
+    $\cA_\cI(s_t) \leftarrow \textsc{FeasibilityMonitor}(s_t, \cI(s_t), \delta_{\max})$\;
+    \lIf{$\cA_\cI(s_t) = \textsc{Infeasible}$}{\textbf{break}}
+
+    \Comment{$\epsilon$-greedy over admissible actions only}
+    \eIf{$\text{Uniform}(0,1) < \epsilon$}{
+      $a_t \leftarrow \text{Uniform}(\cA_\cI(s_t))$\;
+    }{
+      $a_t \leftarrow \argmax_{a \in \cA_\cI(s_t)} Q_\cI(s_t, a)$\;
+    }
+
+    Execute $a_t$;\; observe $r_t,\, s_{t+1}$\;
+
+    $\cA_\cI(s_{t+1}) \leftarrow \cI(s_{t+1})$\;
+
+    \Comment{Masked Bellman update}
+    $Q_\cI(s_t, a_t) \leftarrow Q_\cI(s_t, a_t)
+      + \alpha \!\left[r_t + \gamma \max_{a' \in \cA_\cI(s_{t+1})}
+        Q_\cI(s_{t+1}, a') - Q_\cI(s_t, a_t)\right]$\;
+
+    $s_t \leftarrow s_{t+1}$\;
+  }
+}
+
+\textbf{return} $Q_\cI$\;
+\end{algorithm}
+
+\subsection{Masked Policy Gradient}
+
+Algorithm~\ref{alg:masked-pg} applies REINFORCE with a masked softmax
+policy. Inadmissible actions receive logit $-\infty$ before the softmax,
+guaranteeing zero probability mass on normatively excluded actions
+\citep{huang2022} during both training and execution.
+
+\begin{algorithm}[H]
+\caption{Masked Policy Gradient (REINFORCE with Action Masking)}
+\label{alg:masked-pg}
+\KwInput{Policy network $\pi_\theta$ with parameters $\theta$;\;
+         intent-constraint function $\cI$;\;
+         number of episodes $N$;\;
+         episode horizon $T$}
+\KwOutput{Trained parameters $\theta^*$}
+\KwParam{Learning rate $\eta > 0$;\; discount $\gamma \in [0,1)$}
+
+\BlankLine
+Initialise $\theta$ randomly\;
+
+\For{episode $= 1$ \KwTo $N$}{
+  Observe $s_0$;\; $\tau \leftarrow \{\}$\;
+
+  \For{$t = 0$ \KwTo $T-1$}{
+    $\cA_\cI(s_t) \leftarrow \textsc{FeasibilityMonitor}(s_t, \cI(s_t), \delta_{\max})$\;
+
+    \Comment{Compute masked logits and softmax policy}
+    $z_t(a) \leftarrow \begin{cases}
+      \pi_\theta(a \given s_t) & \text{if } a \in \cA_\cI(s_t) \\
+      -\infty                  & \text{otherwise}
+    \end{cases}$\;
+
+    $\hat{\pi}(a \given s_t) \leftarrow
+      \dfrac{\exp(z_t(a))}{\sum_{a'} \exp(z_t(a'))}$\;
+
+    Sample $a_t \sim \hat{\pi}(\cdot \given s_t)$;\;
+    Execute $a_t$;\; observe $r_t,\, s_{t+1}$\;
+    Append $(s_t, a_t, r_t)$ to $\tau$\;
+    $s_t \leftarrow s_{t+1}$\;
+  }
+
+  \Comment{Compute discounted returns}
+  \For{$t = 0$ \KwTo $T-1$}{
+    $G_t \leftarrow \displaystyle\sum_{t'=t}^{T-1} \gamma^{t'-t} r_{t'}$\;
+  }
+
+  \Comment{Policy gradient update}
+  $\theta \leftarrow \theta + \eta \displaystyle\sum_{t=0}^{T-1}
+    G_t \nabla_\theta \log \hat{\pi}(a_t \given s_t)$\;
+}
+
+\textbf{return} $\theta^* \leftarrow \theta$\;
+\end{algorithm}
+
+% -----------------------------------------------------------------------
+\section{Full Agentic Commerce Pipeline}
+\label{sec:pipeline}
+% -----------------------------------------------------------------------
+
+Algorithm~\ref{alg:pipeline} integrates all components into the complete
+end-to-end execution loop for an Agentic Commerce transaction. At each
+time step the agent (i) updates its POMDP belief over hidden market state,
+(ii) parses or re-evaluates intent constraints, (iii) checks feasibility,
+(iv) selects the optimal admissible action, and (v) logs a verifiable
+certificate of execution.
+
+\begin{algorithm}[H]
+\caption{Agentic Commerce ICMDP Execution Pipeline}
+\label{alg:pipeline}
+\KwInput{Natural language instruction $l$;\;
+         pre-trained policy $\pi_\cI^*$ (or $Q_\cI^*$);\;
+         initial belief $b_0 \in \Delta(\cS)$;\;
+         transaction horizon $T$;\;
+         observation model $\cZ$}
+\KwOutput{Transaction log $\mathcal{T}$;\; execution certificate $\mathcal{C}$}
+
+\BlankLine
+$\mathcal{T} \leftarrow \{\}$;\;
+$\mathcal{C} \leftarrow \{\}$\;
+
+\Comment{Step 1 — Parse intent once at transaction start}
+$\hat{s}_0 \leftarrow \argmax_{s} b_0(s)$\;
+$\cA_\cI \leftarrow \textsc{LLMIntentParser}(l,\, \hat{s}_0,\, \cA,\, \theta)$\;
+\Comment*[r]{Algorithm~\ref{alg:intent-parser}}
+
+\For{$t = 0$ \KwTo $T - 1$}{
+
+  \Comment{Step 2 — POMDP belief update}
+  \lIf{$t > 0$}{$b_t \leftarrow \textsc{BeliefUpdate}(b_{t-1},\, a_{t-1},\, o_t,\, \cP,\, \cZ)$}
+
+  \Comment{Step 3 — State estimate from belief}
+  $\hat{s}_t \leftarrow \argmax_{s} b_t(s)$\;
+
+  \Comment{Step 4 — Re-evaluate admissibility at current state}
+  $\cA_\cI(s_t) \leftarrow \{a \in \cA_\cI : \text{all predicates satisfied at } \hat{s}_t\}$\;
+
+  \Comment{Step 5 — Feasibility check}
+  $\cA_\cI(s_t) \leftarrow \textsc{FeasibilityMonitor}(\hat{s}_t,\, \cA_\cI(s_t),\, \delta_{\max})$\;
+  \Comment*[r]{Algorithm~\ref{alg:feasibility}}
+  \lIf{$\cA_\cI(s_t) = \textsc{Infeasible}$}{\textbf{abort} transaction}
+
+  \Comment{Step 6 — Select optimal admissible action}
+  $a_t^* \leftarrow \pi_\cI^*(\hat{s}_t)$\Comment*[r]{or $\argmax_{a \in \cA_\cI(s_t)} Q_\cI^*(s_t, a)$}
+
+  \Comment{Step 7 — Execute and observe}
+  Execute $a_t^*$;\; receive reward $r_t$;\; observe $o_{t+1}$\;
+
+  \Comment{Step 8 — Log certificate entry}
+  $\mathcal{C} \leftarrow \mathcal{C} \cup
+    \{(t,\; b_t,\; \cA_\cI(s_t),\; a_t^*,\; \text{proof: } a_t^* \in \cI(\hat{s}_t))\}$\;
+  $\mathcal{T} \leftarrow \mathcal{T} \cup \{(t,\; a_t^*,\; r_t,\; o_{t+1})\}$\;
+}
+
+\textbf{return} $\mathcal{T},\; \mathcal{C}$\;
+\end{algorithm}
+
+\paragraph{Certificate of execution.}
+Each entry in $\mathcal{C}$ records the belief state $b_t$, the
+admissible set $\cA_\cI(s_t)$, the chosen action $a_t^*$, and a proof
+that $a_t^* \in \cI(\hat{s}_t)$. This provides the user with a formal,
+step-by-step audit trail that the agent operated within intent boundaries
+throughout the transaction — a guarantee unavailable in reward-shaped or
+expectation-constrained systems.
+
+% -----------------------------------------------------------------------
+\section{Complexity Notes}
+\label{sec:complexity}
+% -----------------------------------------------------------------------
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ICVI} converges in $O\!\left(\frac{|\cS|^2 |\cA|}{(1-\gamma)\varepsilon}\right)$
+  iterations \citep{puterman1994}, reduced to
+  $O\!\left(\frac{|\cS|^2 |\cA_\cI|}{(1-\gamma)\varepsilon}\right)$ under
+  intent masking when $|\cA_\cI(s)| \ll |\cA|$.
+
+  \item \textbf{ICPI} converges in at most $|\cA_\cI|^{|\cS|}$ iterations
+  (polynomial in practice).
+
+  \item \textbf{Masked Q-Learning} inherits the $O(|\cS||\cA_\cI|)$ per-step
+  cost of standard Q-learning, with reduced exploration space.
+
+  \item \textbf{Intent parsing} (Algorithm~\ref{alg:intent-parser}) introduces
+  a one-time LLM inference cost at transaction start, plus re-evaluation cost
+  at each step where state-dependent predicates change.
+
+  \item \textbf{Feasibility monitoring} is $O(|\cA|)$ per state and should be
+  invoked before every policy query.
+\end{itemize}
+
+% -----------------------------------------------------------------------
+%  Bibliography
+% -----------------------------------------------------------------------
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}
