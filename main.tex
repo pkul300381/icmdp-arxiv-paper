@@ -672,9 +672,11 @@ makes the control problem non-stationary. Third, if the active intent and its
 evolution can be included in a time-homogeneous Markov state, the problem can
 instead be formulated as a larger stationary MDP.
 
-An activated update changes the maximization domain from
-$\cA_0(s)$ to $\cA_{I_t}(s)=\cA_0(s)\cap I_t(s)$; it does not, by itself,
-change $R$ or $\cP$. Three latency measures are relevant.
+An activated intent update replaces the previously active effective action set
+$\cA_{I_{\mathrm{old}}}(s)$ with
+$\cA_{I_{\mathrm{new}}}(s)=\cA_0(s)\cap I_{\mathrm{new}}(s)$; it does not, by
+itself, change $R$ or $\cP$. For initial intent activation, the prior action
+domain may simply be $\cA_0(s)$. Three latency measures are relevant.
 \emph{Interpretation/activation latency}, abbreviated below as
 \emph{activation latency}, is the
 interval from receipt of a potentially admissibility-changing instruction to
