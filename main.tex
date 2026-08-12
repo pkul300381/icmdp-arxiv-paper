@@ -15,7 +15,12 @@
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{microtype}
 \usepackage{xcolor}
+\usepackage[normalem]{ulem}
 \usepackage{enumitem}
+% Visible revision markup for this review pass. Remove \added/\deleted wrappers
+% (and the ulem package) after the changes have been accepted.
+\newcommand{\added}[1]{\textcolor{blue!70!black}{#1}}
+\newcommand{\deleted}[1]{\textcolor{red!75!black}{\sout{#1}}}
 \newcommand{\tbd}[1]{%
   \par\smallskip
   \noindent\fcolorbox{yellow!45!black}{yellow!10}{%
@@ -133,6 +138,11 @@ reward. Three features of deployed agents complicate this formulation:
   merely undesirable actions and can permit inappropriate trade-offs.
 \end{enumerate}
 
+\added{A finite negative reward changes the relative desirability of an action
+but does not remove that action from the feasible set; if its downstream
+reward is sufficiently large, the action may still be optimal. This differs
+from an instruction intended to make the action inadmissible.}
+
 Large language models (LLMs) are increasingly used to mediate between users
 and decision-making systems, making the third issue especially relevant.
 An agent instructed to \emph{"only interact with verified sellers"} or
@@ -142,6 +152,17 @@ natural-language instruction into a formal specification that can be enforced
 during action selection. Reward learning does not itself provide this
 enforcement interface, while expected cumulative constraints require a
 separate encoding of the instruction as costs and thresholds.
+
+\added{If seller eligibility were globally fixed and known in advance,
+permanently ineligible actions could simply be omitted from the action space.
+The state-dependent formulation is relevant when admissibility depends on
+runtime state, user-specific constraints, or contextual information---for
+example, current seller eligibility, remaining budget, or authorization
+status. As a non-commerce example, a cloud-operations agent may be permitted
+to deploy during normal operation but prohibited from deploying while a
+severity-one production incident is active. The deployment action therefore
+belongs to the global action vocabulary but is admissible only in particular
+states.}
 
 The distinction is clear in \emph{Agentic Commerce}, where an
 autonomous purchasing agent may search, compare, and transact on behalf of a
@@ -189,16 +210,21 @@ by constraining expected cumulative costs \citep{altman1999}.
 \citet{achiam2017cpo} proposed Constrained Policy Optimization (CPO), a
 policy-search algorithm with guarantees for near-constraint satisfaction at
 each iteration; \citet{garcia2015} survey safe RL more broadly. In a CMDP,
-constraints are expectations over cumulative cost. Positive budgets can permit individual
-violations, whereas a nonnegative violation cost with zero budget can encode
-zero expected discounted violation occupancy.
+constraints are expectations over cumulative cost.
+\deleted{Positive budgets can permit individual violations, whereas a
+nonnegative violation cost with zero budget can encode zero expected discounted
+violation occupancy.}\hspace{0.25em}\added{Positive budgets permit nonzero expected
+discounted violation cost, whereas a nonnegative violation cost with zero
+budget can encode zero expected discounted violation occupancy.}
 
 \paragraph{Action masking, shielding, and state-dependent constraints.}
 A separate line of work restricts the action set directly. Action masking
 \citep{huang2022} removes invalid
 actions prior to policy evaluation in model-free RL, and shielding methods
-similarly intervene at the action level to guarantee safety
-specifications are met at every step rather than in expectation. These
+similarly intervene at the action level to
+\deleted{guarantee safety specifications are met at every step rather than in
+expectation}\ \added{enforce specified action-level constraints at each step}.
+These
 methods implement per-step admissibility within standard RL algorithms, but
 their rules are usually specified manually rather than obtained from
 natural-language instructions.
@@ -241,9 +267,15 @@ claim after reviewing their representations, guarantees, and evaluations.}
 We use the term \emph{Intent-Constrained MDP} (ICMDP) for a
 state-dependent admissibility model coupled to language parsing, compilation,
 and runtime enforcement. State-dependent action sets and action masking are
-established mechanisms. The proposed contribution lies in connecting them to
+established mechanisms. \added{We do not claim novelty for restricting
+optimization to actions available in the current state.}
+\deleted{The proposed contribution lies in connecting them to
 natural-language intent, including validation, feasibility handling, and
-auditing. The resulting policy assigns zero
+auditing.}\ \added{Subject to the detailed comparison with related work, the
+proposed contribution is their integration with natural-language intent
+parsing, structured specification, compilation to statewise admissibility,
+validation, runtime enforcement, feasibility handling, and auditing.}
+The resulting policy assigns zero
 probability to actions excluded by the compiled specification, provided that
 the specification, state information, and enforcement mechanism are correct.
 \tbd{Novelty positioning: complete a systematic comparison with the closest
@@ -261,31 +293,64 @@ $\cM = (\cS, \cA, \cP, R, \gamma)$, where:
   \item $\cP : \cS \times \cA \times \cS \to [0,1]$ is the transition
   probability function, with $\cP(s' \given s, a)$ denoting the probability
   of transitioning to state $s'$ upon taking action $a$ in state $s$,
-  \item $R : \cS \times \cA \to \R$ is the reward function, and
+  \item $R : \cS \times \cA \to \R$ is the reward function
+  \deleted{, and}\ \added{. Here $R(s,a)$ denotes the expected one-step reward
+  associated with the state--action pair $(s,a)$.}
   \item $\gamma \in [0,1)$ is the discount factor.
 \end{itemize}
 \end{definition}
 
 Let $\rho\in\Delta(\cS)$ denote the initial-state distribution. Expectations
 over trajectories generated from $\rho$ under policy $\pi$ are written
-$\E_{\rho,\pi}$.
+$\E_{\rho,\pi}$. \added{These expectations average over the initial-state
+distribution, policy randomization when present, and stochastic state
+transitions.}
 
 A \emph{stationary policy} $\pi : \cS \to \Delta(\cA)$ specifies the
 probability $\pi(a \given s)$ of selecting action $a$ in state $s$, where
-$\Delta(\cA)$ denotes the probability simplex over $\cA$. The
-\emph{state-value function} under policy $\pi$ is
+$\Delta(\cA)$ denotes the probability simplex over $\cA$.
+\added{Thus $\pi(\cdot\given s)$ is the agent's action-selection distribution
+in state $s$, whereas $\cP(\cdot\given s,a)$ is the environment's next-state
+distribution after action $a$ is selected.}
+
+\deleted{The state-value function under policy $\pi$ is}\hspace{0.25em}
+\added{For a trajectory generated by policy $\pi$, define the discounted
+return from time $t$ as}
+{\color{blue!70!black}
+\[
+  G_t \coloneqq \sum_{k=0}^{\infty}\gamma^k
+  R(s_{t+k},a_{t+k}).
+\]
+}
+\added{The state-value function is the expected return conditional on starting
+in state $s$:}
 \begin{equation}
-  V^\pi(s) = \E_\pi\!\left[\sum_{t=0}^{\infty} \gamma^t R(s_t, a_t)
+  V^\pi(s) = \added{\E_\pi[G_0\mid s_0=s] =}
+  \E_\pi\!\left[\sum_{t=0}^{\infty} \gamma^t R(s_t, a_t)
   \,\Big|\, s_0 = s\right],
   \label{eq:value}
 \end{equation}
-and the \emph{optimal value function} satisfies the \emph{Bellman optimality
+\added{For a fixed policy, the Bellman expectation equation is}
+{\color{blue!70!black}
+\[
+  V^\pi(s)
+  = \sum_{a\in\cA}\pi(a\given s)
+  \left[R(s,a)+\gamma\sum_{s'\in\cS}
+  \cP(s'\given s,a)V^\pi(s')\right].
+\]
+}
+\added{This decomposition separates the immediate reward from the discounted
+expected continuation value under policy $\pi$.}
+
+\deleted{and the}\ \added{The} \emph{optimal value function} satisfies the \emph{Bellman optimality
 equation}:
 \begin{equation}
   V^*(s) = \max_{a \in \cA}\!\left[R(s,a) + \gamma
     \sum_{s' \in \cS} \cP(s' \given s, a)\, V^*(s')\right].
   \label{eq:bellman}
 \end{equation}
+\added{Equation~\eqref{eq:bellman} gives the optimal value, while a maximizing
+action yields an optimal deterministic decision rule.}
 An optimal deterministic decision rule $\mu^*:\cS\to\cA$ may be selected as
 \begin{equation}
   \mu^*(s) \in \argmax_{a \in \cA}\!\left[R(s,a) + \gamma
@@ -317,7 +382,8 @@ A \emph{Constrained Markov Decision Process} augments an MDP with a set of
 cost functions and associated thresholds:
 $\cM_C = (\cS, \cA, \cP, R, \{C_k\}_{k=1}^n, \{d_k\}_{k=1}^n, \gamma)$,
 where $C_k : \cS \times \cA \to \R$ is the $k$-th cost function and
-$d_k \in \R$ is its threshold.
+$d_k \in \R$ is \deleted{its threshold}\ \added{the permitted upper bound, or
+budget, on the expected discounted cumulative cost associated with $C_k$}.
 \end{definition}
 
 The CMDP optimization problem is:
@@ -328,6 +394,9 @@ The CMDP optimization problem is:
   \quad k = 1,\ldots,n.
   \label{eq:cmdp}
 \end{equation}
+\added{Equation~\eqref{eq:cmdp} constrains expected discounted cumulative
+cost. For a positive budget $d_k>0$, feasibility does not in general imply
+that every realized trajectory is violation-free.}
 A standard approach forms a relaxation of~\eqref{eq:cmdp} via Lagrange multipliers
 $\bm{\lambda} = (\lambda_1, \ldots, \lambda_n) \geq \mathbf{0}$
 \citep{altman1999,achiam2017cpo}:
@@ -339,19 +408,48 @@ $\bm{\lambda} = (\lambda_1, \ldots, \lambda_n) \geq \mathbf{0}$
     - d_k\right).
   \label{eq:lagrangian}
 \end{equation}
+\added{Each nonnegative multiplier $\lambda_k$ acts as a shadow price on
+excess expected cost relative to budget $d_k$.}
 Under the standard feasibility and strong-duality conditions, the constrained
 problem can be recovered from the saddle-point formulation
-$\min_{\bm\lambda \geq 0} \max_\pi \mathcal{L}(\pi, \bm\lambda)$. Typical
+$\min_{\bm\lambda \geq 0} \max_\pi \mathcal{L}(\pi, \bm\lambda)$.
+\added{The Lagrangian is an optimization device for solving the constrained
+problem; it is not itself a runtime action filter, and practical constraint
+satisfaction depends on the solver and approximation regime.}
+Typical
 constraints include resource budgets, safety thresholds, and regulatory
 requirements.
 
-For nonnegative violation costs, positive-budget CMDP constraints can trade
-isolated violations against costs elsewhere on a trajectory. Zero-budget
-constraints with nonnegative indicator
-costs can encode some hard prohibitions, but this representation does not
-itself supply a modular interface for compiling and auditing natural-language
-intent. The ICMDP construction developed next makes that statewise interface
-explicit.
+\deleted{For nonnegative violation costs, positive-budget CMDP constraints can
+trade isolated violations against costs elsewhere on a trajectory. Zero-budget
+constraints with nonnegative indicator costs can encode some hard
+prohibitions, but this representation does not itself supply a modular
+interface for compiling and auditing natural-language intent. The ICMDP
+construction developed next makes that statewise interface explicit.}
+\added{For a nonnegative violation cost, a positive CMDP budget permits
+nonzero expected discounted violation cost and therefore does not, in general,
+\deleted{imply zero violation probability on every trajectory.}\hspace{0.25em}
+\added{imply that violations occur with probability zero.} By contrast, when the
+violation cost is nonnegative and the budget is zero, feasibility can encode
+zero discounted violation occupancy along trajectories induced by the
+specified initial-state distribution and policy, as formalized in
+Proposition~\ref{prop:cmdp_encoding}. The distinction developed below is
+therefore not that CMDPs are incapable of representing zero-violation
+requirements. Rather, ICMDP makes the statewise admissible-action set explicit
+as an interface for compilation, runtime filtering, feasibility checks, and
+auditing of user intent.}
+
+\added{The distinction between cumulative and statewise constraints also
+depends on the state representation. For example, a
+\deleted{cumulative resource budget}\hspace{0.25em}\added{pathwise cumulative resource
+limit} can be made state-local by augmenting the state with the remaining
+budget $b_t$; an action of cost $c(a)$ is then admissible only when
+$c(a)\leq b_t$, with $b_{t+1}=b_t-c(a)$.
+\added{This does not make a general expected-cost CMDP constraint equivalent
+to a statewise filter, but illustrates how some history-dependent constraints
+can become Markovian through state augmentation.} Consequently, comparisons
+between cumulative-cost and admissible-action formulations should not rely on
+a blanket expressiveness claim.}
 
 % -----------------------------------------------------------------------
 \section{Intent-Constrained Markov Decision Processes}
@@ -363,58 +461,111 @@ explicit.
 
 \begin{definition}[ICMDP]
 \label{def:icmdp}
-An \emph{Intent-Constrained Markov Decision Process} is a tuple
+\deleted{An \emph{Intent-Constrained Markov Decision Process} is a tuple}
 \[
-  \cM_I = (\cS,\, \cA,\, \cP,\, R,\, \gamma,\, \cI),
+  \deleted{\cM_I = (\cS,\, \cA,\, \cP,\, R,\, \gamma,\, \cI),}
 \]
-where $(\cS, \cA, \cP, R, \gamma)$ are defined as in a standard MDP and
-$\cI : \cS \to 2^{\cA}$ is the \emph{intent-constraint function} that maps
-each state to the set of \emph{intent-admissible} actions.
+\deleted{where $(\cS, \cA, \cP, R, \gamma)$ are defined as in a standard MDP
+and}\\
+\deleted{$\cI : \cS \to 2^{\cA}$ is the \emph{intent-constraint function}
+that maps each state}\\
+\deleted{to the set of \emph{intent-admissible} actions.}
+\added{An \emph{Intent-Constrained Markov Decision Process} augments an MDP
+$(\cS,\cA,\cP,R,\gamma)$ with an intent-admissibility function
+$\cI:\cS\to\mathcal P(\cA)$, where $\mathcal P(\cA)$ denotes the power set of
+$\cA$. Let $\cA_0(s)\subseteq\cA$ denote the actions operationally available
+in state $s$. Write $\cA_\cI(s)$ for the effective intent-constrained action
+set, defined below.}
+\added{If every action in the global vocabulary is operationally meaningful in
+every state, then $\cA_0(s)=\cA$. The function $\cI$ restricts the feasible
+action set; it does not select or optimize among those actions. Reward
+optimization operates only over $\cA_\cI(s)$. We denote the resulting model by
+$\cM_I$.}
 \end{definition}
+
+\added{User intent modifies the admissible action set associated with a state;
+it does not ordinarily alter the MDP state space. State augmentation is a
+separate modeling operation used when additional history or context---such as
+remaining budget or current intent---must be included in the Markov state.}
 
 The ICMDP imposes a \emph{hard admissibility condition} on every policy:
 \begin{equation}
-  \pi(a \given s) = 0 \quad \forall\, a \notin \cI(s),\; \forall\, s \in \cS.
+  \pi(a \given s) = 0 \quad
+  \forall\, a \notin \deleted{\cI(s)}\hspace{0.25em}\added{\cA_\cI(s)},\;
+  \forall\, s \in \cS.
   \label{eq:hard_constraint}
 \end{equation}
 Equation~\eqref{eq:hard_constraint} imposes admissibility at action-selection
-time rather than through a cost representation. The
-\emph{intent-feasible action set} at state $s$ is
+time rather than through a cost representation.
 \begin{equation}
-  \cA_\cI(s) \coloneqq \cI(s).
+  \added{\cA_\cI(s)\coloneqq\cA_0(s)\cap\cI(s).}
   \label{eq:feasible_set}
 \end{equation}
 The \emph{admissible policy class} is
 \begin{equation}
-  \Pi_\cI \coloneqq \bigl\{ \pi \in \Delta(\cA)^\cS :
-    \pi(a \given s) = 0 \;\;\forall\, a \notin \cI(s),\;
-    \forall\, s \in \cS \bigr\}.
+  \Pi_\cI \coloneqq
+  \left\{
+  \deleted{\pi \in \Delta(\cA)^\cS}\hspace{0.25em}\added{\pi:\cS\to\Delta(\cA)}
+  \;\middle|\;
+  \pi(a \given s)=0\ \ \forall\,a\notin
+  \deleted{\cI(s)}\hspace{0.25em}\added{\cA_\cI(s)},\ \forall\,s\in\cS
+  \right\}.
   \label{eq:policy_class}
 \end{equation}
 
+\added{In the formal model, $\pi$ denotes the effective action-selection
+policy after admissibility enforcement. An upstream proposal policy or model
+may assign probability to excluded actions, but such probability is outside
+the executed policy represented by $\pi$. The admissibility function
+determines which actions may be considered; the MDP objective still determines
+which admissible action is preferred.}
+
 A sufficient precondition for globally well-defined Bellman updates is
-\emph{intent feasibility}: there must exist at least one admissible action in
+\deleted{intent feasibility}\hspace{0.25em}\added{global intent feasibility}:
+there must exist at least one admissible action in
 every state.
 
-\begin{definition}[Intent Feasibility]
+\deleted{\textbf{Definition 3.2 (Intent Feasibility).}}
+\begin{definition}[\added{Global Intent Feasibility}]
 \label{def:feasibility}
-An ICMDP $\cM_I$ is \emph{intent-feasible} if and only if
+An ICMDP $\cM_I$ is \deleted{\emph{intent-feasible}}\hspace{0.25em}\added{\emph{globally
+intent-feasible}} if and only if
 \begin{equation}
   \cA_\cI(s) \neq \emptyset \quad \forall\, s \in \cS.
   \label{eq:feasibility}
 \end{equation}
 \end{definition}
 
+\added{This global condition is stronger than feasibility restricted to states
+reachable from a particular initial-state distribution $\rho$, but it ensures
+that the Bellman operator is well defined over the full state space.
+Reachability-restricted feasibility is discussed separately where relevant.}
+
+\begin{remark}[\added{Unreachable states}]
+\added{An empty admissible set at a state unreachable from the specified
+initial distribution does not affect executions originating from that
+distribution, although it violates the stronger global condition in
+Definition~\ref{def:feasibility}.}
+\end{remark}
+
 If feasibility fails at some state $s^*$, then $\cA_\cI(s^*) = \emptyset$
 and the Bellman recursion~\eqref{eq:icmdp_bellman} below is undefined there.
 At such a state, an implementation must stop, invoke a predefined safe
 fallback, or request a revised instruction. Silent relaxation would change
 the specified problem; any relaxation must be authorized separately.
+\added{If a safe fallback is modeled as an action within the MDP, it must
+belong to $\cA_0(s)$ and satisfy the applicable intent constraints. Otherwise,
+termination, human escalation, or clarification is an external control action
+that ends or suspends the modeled decision process.}
 
 Unless stated otherwise, the agent observes either $s$ or an exact sufficient
 statistic for both control and admissibility, and $\cI(s)$ is assumed to match
 the user's instruction. Sections~\ref{sec:llm} and~\ref{sec:discussion}
 examine these assumptions.
+
+\added{A fixed intent function $\cI$ may return different permitted sets in
+different states without making the MDP non-stationary. Dynamic intent instead
+refers to the mapping itself changing over time, represented by $\cI_t$.}
 
 \subsection{Optimality and Relationship to Existing Models}
 \label{subsec:optimality}
@@ -437,7 +588,8 @@ $\pi_\cI^*(a\given s)=\mathbf{1}\{a=\mu_\cI^*(s)\}$.
 
 \begin{theorem}[Contraction and optimality]
 \label{thm:contraction}
-For a finite, intent-feasible ICMDP with bounded rewards and
+For a finite, \deleted{intent-feasible}\hspace{0.25em}\added{globally
+intent-feasible} ICMDP with bounded rewards and
 $\gamma\in[0,1)$, define
 \[
   (T_\cI V)(s) \coloneqq
@@ -468,7 +620,8 @@ admissible policy.
 \end{proof}
 
 \begin{remark}[Reduction to MDP]
-When $\cI(s) = \cA$ for all $s$, the ICMDP reduces to a standard MDP.
+When \deleted{$\cI(s) = \cA$}\hspace{0.25em}\added{$\cA_0(s)=\cI(s)=\cA$} for
+all $s$, the ICMDP reduces to a standard MDP.
 \end{remark}
 
 \begin{proposition}[Zero-budget CMDP encoding]
@@ -477,9 +630,12 @@ Fix an initial-state distribution $\rho$ and assume $\gamma\in(0,1)$. For an
 ICMDP, define the nonnegative
 violation cost
 \[
- C_\cI(s,a)\coloneqq\mathbf{1}\{a\notin\cI(s)\}
+ C_\cI(s,a)\coloneqq\mathbf{1}\{a\notin
+ \deleted{\cI(s)}\hspace{0.25em}\added{\cA_\cI(s)}\}
 \]
-and impose the CMDP constraint
+\added{Thus the cost encodes exclusion from the complete effective action set,
+including both operational availability and compiled intent.}
+\deleted{and impose}\hspace{0.25em}\added{We then impose} the CMDP constraint
 \[
  \E_{\rho,\pi}\!\left[\sum_{t=0}^{\infty}
  \gamma^t C_\cI(s_t,a_t)\right]\leq 0.
@@ -525,10 +681,21 @@ mid-execution:
   \cI_t(s) \neq \cI_{t'}(s) \quad \text{for some } t \neq t'.
   \label{eq:dynamic_intent}
 \end{equation}
-The resulting decision process is non-stationary. Updating $\cI_t$ requires
-policy recomputation or online adaptation, together with a feasibility check
-under the revised constraint (Definition~\ref{def:feasibility}). Efficient
-algorithms for this setting remain to be developed.
+\deleted{The resulting decision process is non-stationary. Updating}
+\deleted{$\cI_t$} \deleted{requires policy recomputation or online adaptation,
+together with a feasibility check under the revised constraint}\\
+\deleted{(Definition~\ref{def:feasibility}). Efficient algorithms for this
+setting remain to be developed.}
+\added{If intent is represented as an exogenous time-varying admissibility
+function $\cI_t$, the resulting control problem is non-stationary and may
+require policy recomputation or online adaptation together with a new
+feasibility check (Definition~\ref{def:feasibility}). Alternatively, when the
+\deleted{relevant intent or context dynamics can themselves be represented,
+they may be incorporated into an augmented state, yielding a larger stationary
+formulation.}\hspace{0.25em}\added{relevant intent or context can be incorporated into an
+augmented state and its evolution can be represented by time-homogeneous
+Markov dynamics, the problem may be reformulated as a larger stationary MDP.}
+We do not develop either case here.}
 
 % -----------------------------------------------------------------------
 \section{Intent Parsing and Enforcement}
@@ -548,21 +715,27 @@ An \emph{LLM-based intent parser} and an \emph{intent compiler} are mappings
 \begin{equation}
   f_\phi : \cL \times \cX \to \mathcal{G},
   \qquad
-  g : \mathcal{G}\times\cS\to 2^{\cA},
+  g : \mathcal{G}\times\cS\to
+  \deleted{2^{\cA}}\hspace{0.25em}\added{\mathcal P(\cA)},
   \qquad
   \cI_{l,x}(s)=g(f_\phi(l,x),s),
   \label{eq:llm_map}
 \end{equation}
 where $\phi$ denotes the parser parameters. The parser produces a structured
 specification, while the compiler evaluates that specification in state $s$
-to produce the admissible action set.
+to produce the \deleted{admissible action set}\hspace{0.25em}\added{set permitted by the
+compiled intent}.
 \end{definition}
 
 For example, consider the instruction
 \emph{"purchase Product X only from a verified seller without making the
 remaining budget negative."} In an Agentic Commerce state $s$, let
 $\operatorname{verified}(v,s)\in\{0,1\}$ denote the verification status of
-seller $v$ and let $b(s)$ denote the remaining authorized budget. For a
+seller $v$ and let $b(s)$ denote the remaining authorized budget.
+\added{The dependence of $\operatorname{verified}(v,s)$ on $s$ is intentional:
+seller eligibility is evaluated from information available in the current
+state rather than treated as a permanently fixed property.}
+For a
 purchase action $a=\operatorname{buy}(v,X,p)$ for Product X from seller $v$ at
 total price $p$, the compiler may define
 \begin{equation}
@@ -574,7 +747,8 @@ total price $p$, the compiler may define
   \label{eq:commerce_intent}
 \end{equation}
 The reward can then optimize price, delivery time, or product quality among
-admissible purchase actions. Equation~\eqref{eq:commerce_intent} assumes that
+\deleted{admissible purchase actions}\hspace{0.25em}\added{purchase actions in the effective
+set $\cA_\cI(s)=\cA_0(s)\cap\cI_{l,x}(s)$}. Equation~\eqref{eq:commerce_intent} assumes that
 seller verification and remaining budget are represented in the state.
 Identity, delegated payment authorization, checkout, and settlement remain
 responsibilities of the surrounding commerce infrastructure rather than the
@@ -584,8 +758,10 @@ The parser $f_\phi$ performs semantic interpretation, not action optimization.
 The intermediate language $\mathcal G$ permits schema and consistency checks
 before the deterministic compiler $g$ is admitted to the action-selection
 path. The ICMDP optimization~\eqref{eq:icmdp_bellman} then operates over the
-compiled set. Thus the LLM does not enforce the constraint; the compiler and
-action filter do. The parser and compiler can also be revised independently.
+\deleted{compiled set}\hspace{0.25em}\added{effective admissible set}. Thus the LLM does not
+enforce the constraint; the compiler produces the semantic intent
+specification $\cI(s)$, while the action filter enforces $\cA_\cI(s)$. The
+parser and compiler can also be revised independently.
 \tbd{Intent language: define the syntax and semantics of $\mathcal G$, its
 grounding context $\cX$, supported statewise and temporal predicates, conflict
 resolution, and compilation algorithm $g$.}
@@ -620,9 +796,14 @@ after the fact. The trace records membership in $\cA_\cI(s_t)$, not a
 statistical property of the policy. It can therefore support an audit of the
 compiled filter, but it does not show that the parsed specification matches
 the user's meaning.
-\tbd{Viability: develop a forward-looking check that prevents admissible
-actions from entering states with no admissible continuation; current-state
-nonemptiness alone does not guarantee future feasibility.}
+\deleted{\textbf{TBD Viability:} develop a forward-looking check that prevents
+admissible actions from entering states with no admissible continuation;
+current-state nonemptiness alone does not guarantee future feasibility.}
+\tbd{Viability: when global feasibility has not been established---for example
+under runtime-only feasibility checks, dynamic intent, or richer temporal
+constraints---current-state nonemptiness does not by itself establish the
+existence of a feasible continuation. Develop an appropriate viability or
+reachability condition for these settings.}
 \tbd{Verification: define a threat model, trusted computing boundary, log
 integrity mechanism, and machine-checkable proof obligations before describing
 the audit trace as a formal certificate.}
@@ -664,13 +845,17 @@ Policy improvement selects a deterministic admissible decision rule,
 \end{equation}
 The induced policy places unit mass on $\mu_{k+1}(s)$. For a directly specified
 admissible set, no Lagrangian relaxation is required; compliance with the
-compiled set follows by construction of $\Pi_\cI$.
+\deleted{compiled set}\hspace{0.25em}\added{effective admissible set} follows by construction
+of $\Pi_\cI$.
 
 \paragraph{Model-free learning.}
-In model-free settings, ICMDP can be implemented via action masking in
+\deleted{In model-free settings, ICMDP can be implemented via action masking in
 Q-learning and policy-gradient algorithms. Let
 $\mathcal{M}(s,a) \in \{0,1\}$ denote the action-masking function, equal to
-$1$ iff $a \in \cA_\cI(s)$. Both the behavior policy used for exploration and
+$1$ iff $a \in \cA_\cI(s)$.}\hspace{0.25em}
+\added{In model-free settings, the admissible set $\cA_\cI(s)$ can be enforced
+through action masking in Q-learning and policy-gradient algorithms.}
+Both the behavior policy used for exploration and
 the next-state bootstrap must be restricted to the admissible sets. For a
 sampled admissible action, the update is
 \begin{equation}
@@ -719,21 +904,38 @@ instead use ordinary restricted-action dynamic programming. Proposition
 distinction, not a blanket claim of greater expressive power.
 
 \paragraph{Empty feasible sets.}
-If $\cI$ is overly restrictive, $\cA_\cI(s) = \emptyset$ for some reachable
+\deleted{If $\cI$ is overly restrictive,}\hspace{0.25em}
+\added{If operational availability or compiled intent leaves}
+$\cA_\cI(s) = \emptyset$ for some reachable
 $s$ and~\eqref{eq:icmdp_bellman} is undefined there (Definition
 \ref{def:feasibility}). Any implementation must therefore include a
 feasibility monitor that checks $\cA_\cI(s_t) \neq \emptyset$ before action
 selection and triggers a predefined safe fallback, termination, or user
 clarification when it fails, as described in Section~\ref{subsec:model}. This
-local check does not by itself prevent a currently admissible action from
-leading to a future state with no admissible continuation.
+\deleted{local check does not by itself prevent a currently admissible action
+from leading to a future state with no admissible continuation.}\hspace{0.25em}
+\added{When only local runtime feasibility is available rather than the global
+condition of Definition~\ref{def:feasibility}, current-state nonemptiness does
+not by itself establish a feasible continuation.}
 
 \paragraph{Changing constraints.}
-Dynamic intent (Section~\ref{subsec:extensions}) breaks the stationarity
-assumption underlying~\eqref{eq:intent_vk}. In practice this requires either
-re-running value iteration after each constraint update or maintaining
-incremental value estimates that are corrected as $\cI_t$ changes; efficient
-incremental algorithms for this setting are an open problem.
+\deleted{Dynamic intent (Section~\ref{subsec:extensions}) breaks the}\\
+\deleted{stationarity assumption underlying~\eqref{eq:intent_vk}. In practice this
+requires either re-running value iteration after each constraint update or
+maintaining incremental value estimates that are corrected as}
+\deleted{$\cI_t$}\\
+\deleted{changes; efficient incremental algorithms for this
+setting are an open problem.}
+\added{When dynamic intent is represented by the exogenous admissibility
+function $\cI_t$ of Section~\ref{subsec:extensions}, it breaks the stationarity
+assumption underlying~\eqref{eq:intent_vk}. In practice, this may require
+re-running value iteration after a constraint update or maintaining
+incremental value estimates as $\cI_t$ changes. If the relevant intent dynamics
+\deleted{are instead incorporated into an augmented state, stationary methods
+apply to the enlarged model;}\hspace{0.25em}\added{can instead be represented within a
+time-homogeneous Markov augmented state, stationary methods apply to the
+enlarged model;} the computational implications of either formulation remain
+open.}
 \tbd{Dynamic intent: define the update protocol, consistency semantics, and
 regret or convergence objective for non-stationary admissible sets.}
 
@@ -798,7 +1000,9 @@ language.
     Natural-language input &
       Preference data or language-dependent reward model &
       Requires cost/threshold translation &
-      Parsed, validated, and compiled into $\cI$ \\
+      \deleted{Parsed, validated, and compiled into $\cI$}
+      \added{Parsed, validated, and compiled into $\cI$; intersected with
+      $\cA_0(s)$ to form $\cA_\cI(s)$} \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -806,13 +1010,16 @@ language.
 \subsection{Scope of the Guarantee}
 \label{subsec:guarantees}
 
-Given a correctly specified $\cI$, every policy in $\Pi_\cI$ assigns zero
+Given \deleted{a correctly specified $\cI$}\hspace{0.25em}\added{correctly specified
+$\cA_0$ and $\cI$}, every policy in $\Pi_\cI$ assigns zero
 probability to inadmissible actions by construction
 (Section~\ref{subsec:model}), not by statistical estimation. This statement
-depends on three assumptions from
+depends on \deleted{three}\hspace{0.25em}\added{four} assumptions from
 Section~\ref{subsec:model}: the true state (or an exact sufficient statistic)
-is observed, $\cI$ is derived correctly from the user's instruction, and the
-ICMDP is intent-feasible. Each assumption may fail in practice:
+is observed, \added{$\cA_0$ correctly represents operational availability,}
+$\cI$ is derived correctly from the user's instruction, and the
+ICMDP is \deleted{intent-feasible}\hspace{0.25em}\added{globally intent-feasible}. Each
+assumption may fail in practice:
 
 \paragraph{Parsing errors.}
 Section~\ref{subsec:enforcement} identified over-tightening and
@@ -850,8 +1057,10 @@ evaluated in a live commerce or payment workflow.
 \label{sec:conclusion}
 % -----------------------------------------------------------------------
 
-ICMDP represents a compiled intent specification as the admissible action set
-of an MDP. We derived the restricted Bellman equations and feasibility
+\deleted{ICMDP represents a compiled intent specification as the admissible
+action set of an MDP.}\hspace{0.25em}\added{ICMDP combines baseline operational
+availability with a compiled intent specification to form the effective
+admissible action set of an MDP.} We derived the restricted Bellman equations and feasibility
 conditions, proved contraction and convergence of the Bellman operator, and
 gave standard
 dynamic-programming and model-free implementations over the restricted action
