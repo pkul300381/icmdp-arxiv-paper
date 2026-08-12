@@ -13,7 +13,7 @@
 \usepackage{caption}
 \usepackage[section]{placeins}
 \usepackage{needspace}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{microtype}
 \usepackage{enumitem}
@@ -41,11 +41,12 @@
 \newcommand{\cP}{\mathcal{P}}
 \newcommand{\cZ}{\mathcal{Z}}
 \newcommand{\cL}{\mathcal{L}}
-\newcommand{\cI}{\mathcal{I}}
 \newcommand{\cF}{\mathcal{F}}
 \newcommand{\cM}{\mathcal{M}}
 \newcommand{\cC}{\mathcal{C}}
 \newcommand{\cX}{\mathcal{X}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\cR}{\mathcal{R}}
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\Prob}{\mathbb{P}}
@@ -55,9 +56,9 @@
 % -----------------------------------------------------------------------
 %  Metadata
 % -----------------------------------------------------------------------
-\title{\textbf{From Natural-Language Intent\\
-to Action Constraints in\\
-Markov Decision Processes}}
+\title{\textbf{Intent-Constrained MDPs:\\
+Compiling User-Specified Intent into\\
+Planning-Aware Action Admissibility}}
 
 \author{Parag Kulkarni\\[4pt]
   \small Opus Technologies\\
@@ -81,21 +82,22 @@ agents acting in sequential environments. Reward maximization alone does not
 distinguish an action that is prohibited from one that is merely undesirable.
 We formulate an \emph{Intent-Constrained Markov Decision Process} (ICMDP), in
 which a compiled intent rule is intersected with baseline operational
-availability to define the state-dependent action domain.
+availability to define the effective admissible set.
 
-The principal contribution is a language-to-admissibility architecture. An
-LLM parses an instruction into a typed structured specification; validation
-precedes deterministic compilation into a reusable state-evaluable rule; the
+The principal contribution is a validated, versioned language-to-admissibility
+architecture. An LLM proposes a typed structured specification; deterministic
+validation and compilation produce a reusable state-evaluable rule; and the
 same rule restricts hypothetical actions during planning and filters proposals
-at execution. The LLM remains outside the fast decision loop and outside the
-trusted enforcement boundary. Subject to correct specification, state
+at execution. The LLM remains outside the fast decision loop and the trusted
+enforcement boundary. Atomic version activation separates enforcement of a
+validated rule from subsequent policy optimization. Subject to correct specification, state
 information, activation, and filtering, the executed policy assigns zero
 probability to actions excluded by the active rule. We state feasibility
-conditions, record the inherited Bellman contraction, relate statewise
-exclusions to a zero-budget CMDP encoding, and show how standard restricted-
-action methods apply. A versioned update protocol separates immediate
-compliance from subsequent policy adaptation. The results are theoretical and
-are illustrated through an autonomous cloud-operations example.
+conditions, show that standard discounted dynamic-programming guarantees carry
+over under fixed admissibility, relate statewise exclusions to a zero-budget
+CMDP encoding, and show how standard restricted-action methods apply. The
+results are theoretical and are illustrated through an autonomous
+cloud-operations example.
 \end{abstract}
 
 \medskip
@@ -122,9 +124,8 @@ reward is sufficiently large, the action may still be optimal. This differs
 from an instruction intended to make the action inadmissible.
 
 Large language models (LLMs) are increasingly used to mediate between users
-and decision-making systems, making the third issue especially relevant.
-
-Consider instead an autonomous cloud-operations agent managing a
+and decision-making systems, making language-specified hard restrictions
+especially relevant. Consider an autonomous cloud-operations agent managing a
 production service. Its global action vocabulary may contain deployment,
 rollback, restart, scaling, and no-operation actions. The instruction
 \emph{``Do not deploy while a Severity-1 production incident is active''} must be
@@ -150,31 +151,23 @@ class of Bellman equations. Its central object is the lifecycle by which a
 user's linguistic instruction becomes a validated, executable predicate used
 both during planning and at the final action-selection boundary.
 
-The paper makes four contributions:
+The paper's central contribution is a validated and versioned
+language-to-admissibility lifecycle: natural language is mapped to a validated
+typed specification, a deterministic compiler produces one executable rule,
+and that same rule is visible both to prospective planning over hypothetical
+states and to the final runtime gate. The LLM remains outside the trusted
+boundary, while atomic version activation separates enforcement of a validated
+instruction from re-optimization of behavior. Three supporting
+analyses establish the formal and algorithmic setting:
 \begin{enumerate}[leftmargin=*, label=(\arabic*)]
-  \item We situate the problem relative to constrained and safe
-  decision-making, action masking and shielding, and language-grounded
-  planning and alignment, and identify the integration gap addressed by an
-  explicit language-to-admissibility pipeline (Section~\ref{sec:background}).
-  \item We use the \emph{Intent-Constrained Markov
-  Decision Process} (ICMDP)
-  to formalize the interface between compiled intent and a
-  state-dependent admissible action set. We state its feasibility conditions
-  and the standard Bellman properties inherited under fixed admissibility,
-  and characterize its relationship to CMDP encodings
-  (Section~\ref{sec:icmdp}).
-  \item We
-  specify an end-to-end lifecycle that treats an LLM as an intent
-  parser, validates its structured output, compiles a rule evaluable on
-  arbitrary hypothetical states, incorporates that rule into planning, and
-  enforces it through a separate runtime filter. This separation identifies
-  the trusted enforcement boundary, supports atomic intent updates and audit
-  logging, and distinguishes specification correctness from enforcement
-  correctness
-  (Section~\ref{sec:llm}).
-  \item We show how standard dynamic-programming and model-free methods operate
-  over the restricted action domain, and analyze computational cost and
-  robustness to infeasibility and parser error
+  \item the ICMDP interface, its feasibility conditions, and the standard
+  discounted dynamic-programming properties inherited under fixed
+  admissibility (Section~\ref{sec:icmdp});
+  \item the precise relationship between statewise intent exclusions and a
+  zero-budget CMDP encoding, together with a versioned protocol for changing
+  intent (Sections~\ref{subsec:optimality} and~\ref{subsec:extensions}); and
+  \item compatibility with standard restricted-action planning and model-free
+  algorithms, including their computational costs and failure conditions
   (Section~\ref{sec:algorithms}).
 \end{enumerate}
 
@@ -224,13 +217,17 @@ tool-use policies into SMT constraints and intercept proposed tool calls at
 runtime. The last system is particularly close to the enforcement side of the
 present architecture; its formal checks apply at the tool-call boundary,
 whereas ICMDP also exposes the same compiled rule to MDP planning over
-hypothetical successor states.
+hypothetical successor states. In adjacent application-management work,
+\citet{dzeparoska2024policy} use LLMs to decompose intents into executable
+policies and closed management loops. That systems pipeline addresses intent
+realization, whereas ICMDP centers planner-visible statewise admissibility and
+a separate hard runtime gate.
 
 \begin{table}[!t]
   \centering
   \caption{Positioning relative to the closest constraint and
-  language-to-policy pipelines. ``Planning-aware'' indicates that the formal
-  restriction is incorporated into prospective policy or value computation.}
+  language-to-policy pipelines. The planning/learning column records whether
+  the restriction can be incorporated before final execution.}
   \label{tab:related_positioning}
   \scriptsize
   \setlength{\tabcolsep}{3pt}
@@ -241,17 +238,18 @@ hypothetical successor states.
                   >{\centering\arraybackslash}p{1.55cm}
                   >{\raggedright\arraybackslash}p{2.9cm}}
     \toprule
-    Approach & NL input & Formal decision artifact & Planning-aware &
+    Approach & NL input & Formal decision artifact & Restriction used in
+    planning or learning? &
     Runtime gate & Update treatment \\
     \midrule
     Shielding \citep{alshiekh2018shielding} & No & Temporal-logic safety
-      specification & Yes & Yes & Specification replacement is not central \\
+      specification & Yes, depending on integration & Yes & Specification replacement is not central \\
     Chua et al. \citep{chua2025nlconstraints} & Yes & Learned CMDP reward and
       constraint functions & Yes & Not central & Adaptation to changed constraints \\
     A-LAMP \citep{jegal2025alamp} & Yes & Generated MDP, environment, and
       trained policy & Yes & No independent gate & Not central \\
     Winston et al. \citep{winston2026solver} & Yes & SMT constraints over
-      observable state and tool arguments & No MDP planning & Yes & Not central \\
+      observable state and tool arguments & No (runtime only) & Yes & Not central \\
     \textbf{ICMDP} & Yes & Typed statewise admissibility rule & Yes & Yes &
       Versioned validation and atomic activation \\
     \bottomrule
@@ -265,9 +263,12 @@ are established mechanisms. ICMDP does not claim novelty for the restricted
 Bellman operator. Its contribution is the connection of a learned semantic
 front end to a deterministic, versioned specification boundary: one validated
 rule governs both planning over future states and filtering at execution, with
-explicit failure handling, atomic updates, and audit records. This combination
-distinguishes the framework from reward- or cost-only language grounding,
-language-to-MDP generation, and runtime-only policy checking.
+explicit failure handling, atomic updates, and audit records. We position this
+combination as the distinguishing feature of the framework relative to reward-
+or cost-only language grounding, language-to-MDP generation, and runtime-only
+policy checking. Example~\ref{ex:runtime_only} illustrates why planner-visible
+admissibility is not operationally equivalent to applying the same rule only
+as a final runtime gate.
 
 
 \subsection{Preliminaries}
@@ -369,24 +370,23 @@ a blanket expressiveness claim.
 \label{def:icmdp}
 An \emph{Intent-Constrained Markov Decision Process} is a tuple
 \[
-  \cM_I=(\cS,\cA,\cA_0,\cP,R,\gamma,\cI),
+  \cM_I=(\cS,\cA,\cA_0,\cP,R,\gamma,I),
 \]
 where $(\cS,\cA,\cP,R,\gamma)$ has the usual MDP components,
 \[
-  \cA_0:\cS\to\mathcal P(\cA),
+  \cA_0:\cS\to 2^{\cA},
   \qquad
-  \cI:\cS\to\mathcal P(\cA),
+  I:\cS\to 2^{\cA},
 \]
 $\cA_0(s)$ is the set of actions operationally available in state $s$, and
-$\cI(s)$ is the set permitted by the active compiled intent rule. Transition
+$I(s)$ is the set permitted by the active compiled intent rule. Transition
 and reward semantics are required for the baseline-available pairs
 $(s,a)$ with $a\in\cA_0(s)$; if they are defined on all of
 $\cS\times\cA$, their values outside that domain are operationally irrelevant.
 If every action in the global vocabulary is operationally meaningful in
-every state, then $\cA_0(s)=\cA$. The function $\cI$ restricts the feasible
-action set; it does not select or optimize among those actions. Reward
-optimization operates only over the effective set
-$\cA_\cI(s)=\cA_0(s)\cap\cI(s)$.
+every state, then $\cA_0(s)=\cA$. The compiled rule $I$ restricts admissibility;
+it does not select or optimize among the remaining actions. Reward optimization
+operates only over the effective admissible set defined below.
 \end{definition}
 
 User intent modifies the admissible action set associated with a state;
@@ -395,19 +395,20 @@ separate modeling operation used when additional history or context---such as
 incident or deployment status
 or current intent---must be included in the Markov state.
 
+The \emph{effective admissible set} is
+\begin{equation}
+  \cA_I(s)\coloneqq\cA_0(s)\cap I(s).
+  \label{eq:feasible_set}
+\end{equation}
 The ICMDP imposes a \emph{hard admissibility condition} on every policy:
 \begin{equation}
   \pi(a \given s) = 0 \quad
-  \forall\, a \notin \cA_\cI(s),\;
+  \forall\, a \notin \cA_I(s),\;
   \forall\, s \in \cS.
   \label{eq:hard_constraint}
 \end{equation}
 Equation~\eqref{eq:hard_constraint} imposes admissibility at action-selection
 time rather than through a cost representation.
-\begin{equation}
-  \cA_\cI(s)\coloneqq\cA_0(s)\cap\cI(s).
-  \label{eq:feasible_set}
-\end{equation}
 
 \begin{example}[Cloud-operations running example]
 \label{ex:cloud}
@@ -427,16 +428,16 @@ and let $\cA_0(s)$ contain the actions operationally available in state $s$.
 For the instruction \emph{``Do not deploy while a Severity-1 production incident
 is active,''} define the stationary compiled rule
 \begin{equation}
- \cI_{\mathrm{sev1}}(s)
+ I_{\mathrm{sev1}}(s)
  =\{a\in\cA:\neg(\operatorname{sev1}(s)\land
  a=\operatorname{Deploy})\}.
  \label{eq:cloud_intent}
 \end{equation}
-The effective set is
-$\cA_{\cI_{\mathrm{sev1}}}(s)=\cA_0(s)\cap
-\cI_{\mathrm{sev1}}(s)$. If deployment is operationally available, then
-$\operatorname{Deploy}\in\cA_{\cI_{\mathrm{sev1}}}(s_{\mathrm{normal}})$ but
-$\operatorname{Deploy}\notin\cA_{\cI_{\mathrm{sev1}}}(s_{\mathrm{Sev1}})$.
+The effective admissible set is
+$\cA_{I_{\mathrm{sev1}}}(s)=\cA_0(s)\cap
+I_{\mathrm{sev1}}(s)$. If deployment is operationally available, then
+$\operatorname{Deploy}\in\cA_{I_{\mathrm{sev1}}}(s_{\mathrm{normal}})$ but
+$\operatorname{Deploy}\notin\cA_{I_{\mathrm{sev1}}}(s_{\mathrm{Sev1}})$.
 Reward may optimize service availability, latency, recovery time, and
 infrastructure cost among the remaining actions.
 \end{example}
@@ -453,12 +454,12 @@ respectively,
   \label{eq:baseline_policy_class}
 \end{equation}
 \begin{equation}
-  \Pi_\cI \coloneqq
+  \Pi_I \coloneqq
   \left\{
   \pi:\cS\to\Delta(\cA)
   \;\middle|\;
   \pi(a \given s)=0\ \ \forall\,a\notin
-  \cA_\cI(s),\ \forall\,s\in\cS
+  \cA_I(s),\ \forall\,s\in\cS
   \right\}.
   \label{eq:policy_class}
 \end{equation}
@@ -481,7 +482,7 @@ every state.
 An ICMDP $\cM_I$ is \emph{globally
 intent-feasible} if and only if
 \begin{equation}
-  \cA_\cI(s) \neq \emptyset \quad \forall\, s \in \cS.
+  \cA_I(s) \neq \emptyset \quad \forall\, s \in \cS.
   \label{eq:feasibility}
 \end{equation}
 \end{definition}
@@ -498,7 +499,31 @@ distribution, although it violates the stronger global condition in
 Definition~\ref{def:feasibility}.
 \end{remark}
 
-If feasibility fails at some state $s^*$, then $\cA_\cI(s^*) = \emptyset$
+\begin{remark}[Simple sufficient condition]
+If there exists an action $a_{\mathrm{safe}}$ such that
+$a_{\mathrm{safe}}\in\cA_0(s)\cap I(s)$ for every $s\in\cS$, then the ICMDP is
+globally intent-feasible. For example, $\operatorname{DoNothing}$ provides this
+condition only when it is operationally available in every state and is never
+prohibited; neither property is assumed in the general model.
+\end{remark}
+
+\begin{definition}[Forward Feasibility]
+\label{def:forward_feasibility}
+A state $s$ is \emph{forward-feasible} under compiled rule $I$ if there exists
+a policy supported on $\cA_I$ such that, starting from $s$, every subsequently
+reached state $s_t$ satisfies $\cA_I(s_t)\neq\emptyset$ almost surely. The
+condition can be checked exactly only when a transition model and a tractable
+reachability or viability method are available; otherwise the runtime monitor
+establishes current-state nonemptiness but not the existence of a feasible
+continuation \citep{yu2022reachability}.
+\end{definition}
+
+Under global intent feasibility, nonempty continuation is immediate at the
+level considered here. Forward feasibility is operationally relevant when
+global feasibility cannot be certified and analysis is limited to the
+reachable region or the current runtime state.
+
+If feasibility fails at some state $s^*$, then $\cA_I(s^*) = \emptyset$
 and the Bellman recursion~\eqref{eq:icmdp_bellman} below is undefined there.
 At such a state, an implementation must stop, invoke a predefined safe
 fallback, or request a revised instruction. Silent relaxation would change
@@ -509,7 +534,7 @@ termination, human escalation, or clarification is an external control action
 that ends or suspends the modeled decision process.
 
 Unless stated otherwise, the agent observes either $s$ or an exact sufficient
-statistic for both control and admissibility, and $\cI(s)$ is assumed to match
+statistic for both control and admissibility, and $I(s)$ is assumed to match
 the user's instruction. Sections~\ref{sec:llm} and~\ref{sec:discussion}
 examine these assumptions.
 
@@ -522,18 +547,18 @@ is formalized in Section~\ref{subsec:extensions}.
 The optimal ICMDP value function satisfies the \emph{intent-constrained
 Bellman optimality equation}:
 \begin{equation}
-  V_\cI^*(s) = \max_{a \in \cA_\cI(s)}\!\left[R(s,a) + \gamma
-    \sum_{s' \in \cS} \cP(s' \given s, a)\, V_\cI^*(s')\right],
+  V_I^*(s) = \max_{a \in \cA_I(s)}\!\left[R(s,a) + \gamma
+    \sum_{s' \in \cS} \cP(s' \given s, a)\, V_I^*(s')\right],
   \label{eq:icmdp_bellman}
 \end{equation}
 with an optimal deterministic admissible decision rule selected as
 \begin{equation}
-  \mu_\cI^*(s) \in \argmax_{a \in \cA_\cI(s)}\!\left[R(s,a) + \gamma
-    \sum_{s' \in \cS} \cP(s' \given s, a)\, V_\cI^*(s')\right].
+  \mu_I^*(s) \in \argmax_{a \in \cA_I(s)}\!\left[R(s,a) + \gamma
+    \sum_{s' \in \cS} \cP(s' \given s, a)\, V_I^*(s')\right].
   \label{eq:icmdp_optpol}
 \end{equation}
 The induced policy is
-$\pi_\cI^*(a\given s)=\mathbf{1}\{a=\mu_\cI^*(s)\}$.
+$\pi_I^*(a\given s)=\mathbf{1}\{a=\mu_I^*(s)\}$.
 
 
 \begin{proposition}[Inherited Bellman contraction for fixed admissibility]
@@ -542,15 +567,15 @@ For a finite, globally
 intent-feasible ICMDP with bounded rewards and
 $\gamma\in[0,1)$, define
 \[
-  (T_\cI V)(s) \coloneqq
-  \max_{a\in\cA_\cI(s)}
+  (T_I V)(s) \coloneqq
+  \max_{a\in\cA_I(s)}
   \left[R(s,a)+\gamma\sum_{s'\in\cS}
   \cP(s'\given s,a)V(s')\right].
 \]
-Then $T_\cI$ is a $\gamma$-contraction under the sup norm. Consequently it has
-a unique fixed point $V_\cI^*$, value iteration converges to that fixed point
+Then $T_I$ is a $\gamma$-contraction under the sup norm. Consequently it has
+a unique fixed point $V_I^*$, value iteration converges to that fixed point
 from any bounded initialization, and a maximizing action in every state
-defines an optimal stationary deterministic policy in $\Pi_\cI$.
+defines an optimal stationary deterministic policy in $\Pi_I$.
 These are standard consequences of discounted dynamic programming with
 fixed state-dependent action sets; the proposition records the property needed
 by the framework rather than asserting a novel contraction theorem.
@@ -559,8 +584,8 @@ by the framework rather than asserting a novel contraction theorem.
 \begin{proof}
 For bounded $V,W$, the standard maximum inequality gives
 \[
- |(T_\cI V)(s)-(T_\cI W)(s)|
- \leq \gamma\max_{a\in\cA_\cI(s)}
+ |(T_I V)(s)-(T_I W)(s)|
+ \leq \gamma\max_{a\in\cA_I(s)}
  \sum_{s'}\cP(s'\given s,a)|V(s')-W(s')|
  \leq\gamma\lVert V-W\rVert_\infty .
 \]
@@ -570,7 +595,7 @@ set is finite and nonempty.
 \end{proof}
 
 \begin{remark}[Reduction to MDP]
-When $\cA_0(s)=\cI(s)=\cA$ for
+When $\cA_0(s)=I(s)=\cA$ for
 all $s$, the ICMDP reduces to a standard MDP.
 \end{remark}
 
@@ -581,36 +606,45 @@ policies to the baseline class $\Pi_0$ in
 Equation~\eqref{eq:baseline_policy_class}. Define the nonnegative
 intent-violation cost on the baseline action process by
 \[
- C_\cI(s,a)\coloneqq
- \mathbf{1}\{a\in\cA_0(s),\ a\notin\cI(s)\}.
+ C_I(s,a)\coloneqq
+ \mathbf{1}\{a\in\cA_0(s),\ a\notin I(s)\}.
 \]
-Thus $\cA_0$ remains the baseline state-dependent action domain, while
-$C_\cI$ encodes only the additional exclusions introduced by user intent. We
+Restricting the comparison to $\Pi_0$ isolates additional exclusions introduced
+by user intent from actions already unavailable under $\cA_0$. Thus $C_I$
+encodes only intent exclusions on the baseline action process. We
 impose the CMDP constraint
 \[
  \E_{\rho,\pi}\!\left[\sum_{t=0}^{\infty}
- \gamma^t C_\cI(s_t,a_t)\right]\leq 0.
+ \gamma^t C_I(s_t,a_t)\right]\leq 0.
 \]
-Every policy in $\Pi_\cI$ is feasible for this CMDP. Conversely, every policy
+Every policy in $\Pi_I$ is feasible for this CMDP. Conversely, every policy
 $\pi\in\Pi_0$ that is CMDP-feasible selects a baseline-available but
 intent-excluded action with probability zero at every time step under the
 trajectory distribution induced by $\rho$ and $\pi$.
 \end{proposition}
 
 \begin{proof}
-For $\pi\in\Pi_\cI$, the violation cost is zero almost surely at every step, so
+For $\pi\in\Pi_I$, the violation cost is zero almost surely at every step, so
 the expected discounted sum is zero. Conversely, every term in the discounted
 sum is nonnegative. By Tonelli's theorem,
 \[
   0 \geq
-  \E_{\rho,\pi}\!\left[\sum_{t\geq0}\gamma^tC_\cI(s_t,a_t)\right]
-  =\sum_{t\geq0}\gamma^t\E_{\rho,\pi}[C_\cI(s_t,a_t)]
+  \E_{\rho,\pi}\!\left[\sum_{t\geq0}\gamma^tC_I(s_t,a_t)\right]
+  =\sum_{t\geq0}\gamma^t\E_{\rho,\pi}[C_I(s_t,a_t)]
   \geq 0.
 \]
 Because $\gamma^t>0$, each expectation is zero; nonnegativity then implies
-$C_\cI(s_t,a_t)=0$ almost surely for every $t$, proving trajectory-level
+$C_I(s_t,a_t)=0$ almost surely for every $t$, proving trajectory-level
 compliance from $\rho$.
 \end{proof}
+
+\begin{remark}[Occupancy-relative support]
+Let $\pi\in\Pi_0$ satisfy the zero-budget constraint. At every state $s$ with
+positive occupancy at some time under the trajectory distribution induced by
+$(\rho,\pi)$, the support of $\pi(\cdot\given s)$ is contained in $\cA_I(s)$.
+The conclusion is trajectory-relative: it does not imply the global condition
+$\pi\in\Pi_I$ at states unreachable from $\rho$.
+\end{remark}
 
 Proposition~\ref{prop:cmdp_encoding} shows that, relative to the same baseline
 availability process, statewise intent exclusions admit a CMDP encoding along
@@ -622,48 +656,57 @@ augmentation or a separate constraint mechanism.
 \label{subsec:extensions}
 
 Standard MDPs assume stationary rewards and transitions. Three cases
-must be distinguished. First, a fixed intent function $\cI$ may yield different
+must be distinguished. First, a fixed compiled rule $I$ may yield different
 admissible sets as the environment state changes; this is ordinary stationary,
 state-dependent admissibility. Second, the user's specification may change
 mid-execution:
 \begin{equation}
-  \cI_t(s) \neq \cI_{t'}(s) \quad \text{for some } t \neq t'.
+  I_t(s) \neq I_{t'}(s) \quad \text{for some } t \neq t'.
   \label{eq:dynamic_intent}
 \end{equation}
 
 Here \emph{exogenous} means that the update is supplied from outside the
 modeled controlled state transition---for example, by a new user instruction---
-rather than generated by $\cP$. An exogenous sequence $\{\cI_t\}$ generally
+rather than generated by $\cP$. An exogenous sequence $\{I_t\}$ generally
 makes the control problem non-stationary. Third, if the active intent and its
 evolution can be included in a time-homogeneous Markov state, the problem can
 instead be formulated as a larger stationary MDP.
 
 An activated update changes the maximization domain from
-$\cA_0(s)$ to $\cA_{\cI_t}(s)=\cA_0(s)\cap\cI_t(s)$; it does not, by itself,
-change $R$ or $\cP$. Two latencies then differ. \emph{Compliance latency} is
-the interval from validated atomic activation to enforcement of the new filter
-and can be limited to the next action-selection boundary. \emph{Optimization
-latency} is the time required to recompute or adapt a policy for the new
-admissible domain. During this interval, an older or generic proposal policy
+$\cA_0(s)$ to $\cA_{I_t}(s)=\cA_0(s)\cap I_t(s)$; it does not, by itself,
+change $R$ or $\cP$. Three latency measures are relevant.
+\emph{Interpretation/activation latency}, abbreviated below as
+\emph{activation latency}, is the
+interval from receipt of a potentially admissibility-changing instruction to
+validated rule activation. \emph{Enforcement latency} is the interval from
+validated activation to the first action-selection boundary governed by the
+new rule. \emph{Optimization latency} is the interval from validated activation
+until a revised constraint-aware proposal policy becomes available. Hence
+\begin{equation}
+  \text{instruction-to-enforcement latency}
+  = \text{activation latency} + \text{enforcement latency}.
+  \label{eq:latency_decomposition}
+\end{equation}
+During the optimization interval, an older or generic proposal policy
 may be used only behind the newly activated filter: its executed actions are
 compliant with the compiled intent, but its behavior need not be optimal under
 that intent.
 
 In the running example, the initial rule is
-$\cI_1=\cI_{\mathrm{sev1}}$: deployment is excluded only while a Sev1 incident
+$I_1=I_{\mathrm{sev1}}$: deployment is excluded only while a Sev1 incident
 is active. If the operator later instructs, \emph{``Freeze all production
 deployments until further notice,''} the newly compiled rule is
 \begin{equation}
-  \cI_2(s)=\{a\in\cA:a\neq\operatorname{Deploy}\}
+  I_2(s)=\{a\in\cA:a\neq\operatorname{Deploy}\}
   \quad\forall s\in\cS.
   \label{eq:deployment_freeze}
 \end{equation}
-This is a genuine update $\cI_1\rightarrow\cI_2$, unlike evaluating the
-unchanged $\cI_1$ in normal and Sev1 states. After validation and atomic
-activation, $\cI_2$ can govern the runtime filter at the next action-selection
-boundary. A policy optimized under $\cI_1$ may continue only behind that filter
-and need not be optimal under $\cI_2$; planning or adaptation may therefore
-compute or approximate $\pi_{\cI_2}^*$.
+This is a genuine update $I_1\rightarrow I_2$, unlike evaluating the
+unchanged $I_1$ in normal and Sev1 states. After validation and atomic
+activation, $I_2$ can govern the runtime filter at the next action-selection
+boundary. A policy optimized under $I_1$ may continue only behind that filter
+and need not be optimal under $I_2$; planning or adaptation may therefore
+compute or approximate $\pi_{I_2}^*$.
 
 A related design conditions a policy on an intent representation $z$,
 writing $\pi(a\mid s,z)$. If $z$ is part of the Markov state and its transition
@@ -692,7 +735,7 @@ fast control loop.
 
 \begin{figure}[htbp]
   \centering
-  \begin{tikzpicture}[
+  \begin{tikzpicture}[scale=1.04,transform shape,
       node distance=4mm,
       >={Latex[length=2mm]},
       box/.style={draw=black, rounded corners, align=center,
@@ -701,18 +744,19 @@ fast control loop.
       note/.style={font=\tiny, align=center}]
     \node[box] (user) at (0,0) {User instruction and grounding context};
     \node[box] (parser) at (2.5,0) {LLM parser $f_\phi$};
-    \node[box] (spec) at (5,0) {Raw structured specification $G_{\mathrm{raw}}$};
+    \node[box] (spec) at (5,0) {Raw structured specification $g_{\mathrm{raw}}$};
     \node[box] (valid) at (7.5,0) {Deterministic validator $v_x$};
     \node[box] (compile) at (10,0) {Deterministic compiler $c$};
-    \node[box] (rule) at (12.5,0) {Versioned executable rule $\cI^{(v)}(\cdot)$};
+    \node[box] (rule) at (12.5,0) {Versioned executable rule $I^{(v)}(\cdot)$};
     \draw[flow] (user) -- (parser);
     \draw[flow] (parser) -- (spec);
     \draw[flow] (spec) -- (valid);
-    \draw[flow] (valid) -- node[note, above] {$G_{l,x}$} (compile);
+    \draw[flow] (valid) -- (compile);
+    \node[note] at (8.75,-0.82) {$g_{l,x}$};
     \draw[flow] (compile) -- (rule);
-    \node[note] at (6.25,0.85) {slow specification lifecycle: parse once, compile once};
+    \node[note] at (6.25,1.05) {slow specification lifecycle: parse once, compile once};
 
-    \node[box] (eval) at (6.25,-1.75) {Rule evaluation $\cA_{\cI^{(v)}}(s)=\cA_0(s)\cap\cI^{(v)}(s)$};
+    \node[box] (eval) at (6.25,-1.75) {Rule evaluation $\cA_{I^{(v)}}(s)=\cA_0(s)\cap I^{(v)}(s)$};
     \node[box] (plan) at (2.5,-3.5) {Constraint-aware planning or learning};
     \node[box] (filter) at (8.5,-3.5) {Runtime admissibility and feasibility gate};
     \node[box] (act) at (12,-3.5) {Executed action and environment};
@@ -743,19 +787,20 @@ fast control loop.
 \begin{enumerate}[leftmargin=*,label=\arabic*.,nosep]
   \item On receiving an instruction that may alter admissibility, enter the
   predefined hold state and parse
-  $G_{\mathrm{raw}}\leftarrow f_\phi(l,x)$.
+  $g_{\mathrm{raw}}\leftarrow f_\phi(l,x)$.
   \item Validate and ground the candidate,
-  $G_{\mathrm{new}}\leftarrow v_x(G_{\mathrm{raw}})$; retain the last validated
-  rule but remain on hold and request clarification or escalation if validation
+  $g_{l,x}\leftarrow v_x(g_{\mathrm{raw}})$; retain the last validated rule in
+  storage but remain on hold and request clarification or escalation if validation
   returns $\bot$.
   \item Compile once:
-  $\cI_{\mathrm{new}}\leftarrow c(G_{\mathrm{new}})$, producing a reusable
+  $I_{\mathrm{new}}\leftarrow c(g_{l,x})$, producing a reusable
   function evaluable on observed or hypothetical states.
-  \item Check current-state nonemptiness and any available forward-reachability
-  condition, then atomically activate
-  $\cI^{(v+1)}\leftarrow\cI_{\mathrm{new}}$; do not silently relax an empty set.
+  \item Check current-state nonemptiness and, when available, forward
+  feasibility under Definition~\ref{def:forward_feasibility}; then atomically
+  activate $I^{(v+1)}\leftarrow I_{\mathrm{new}}$. Do not silently relax an
+  empty set.
   \item Plan or update a proposal policy using
-  $\cA_{\cI^{(v+1)}}(s)=\cA_0(s)\cap\cI^{(v+1)}(s)$ in current-
+  $\cA_{I^{(v+1)}}(s)=\cA_0(s)\cap I^{(v+1)}(s)$ in current-
   and successor-state computations.
   \item At each decision, evaluate the active rule on the current state, filter
   the proposal, execute only an admissible action, and log the state, rule
@@ -773,44 +818,44 @@ fast control loop.
 
 Let $l \in \cL$ denote a natural-language instruction and $x\in\cX$ a
 grounding context that identifies the action vocabulary, state fields, field
-types, enumerated values, and unit conversions. Let $\mathcal G$ denote the
-structured intent language and $\mathcal G_x^{\mathrm{val}}$ the specifications
+types, enumerated values, and unit conversions. Let $\cG$ denote the
+structured intent language and $\cG_x^{\mathrm{val}}$ the specifications
 that have been typed and grounded under $x$. Define the space of
 state-evaluable intent rules as
 \[
-  \mathfrak I
+  \cR
   \coloneqq
-  \{J\mid J:\cS\to\mathcal P(\cA)\}.
+  \{J\mid J:\cS\to 2^{\cA}\}.
 \]
 
 \begin{definition}[Intent parsing, validation, and compilation]
 An \emph{LLM-based intent parser}, deterministic validator, and deterministic
 \emph{intent compiler} are mappings
 \begin{equation}
-  f_\phi : \cL \times \cX \to \mathcal{G},
+  f_\phi : \cL \times \cX \to \cG,
   \qquad
-  v_x:\mathcal G\to\mathcal G_x^{\mathrm{val}}\cup\{\bot\},
+  v_x:\cG\to\cG_x^{\mathrm{val}}\cup\{\bot\},
   \qquad
-  c : \mathcal G_x^{\mathrm{val}}\to\mathfrak I.
+  c : \cG_x^{\mathrm{val}}\to\cR.
   \label{eq:llm_map}
 \end{equation}
 For an accepted instruction,
 \begin{equation}
-  G_{l,x}=v_x\!\left(f_\phi(l,x)\right)\neq\bot,
+  g_{l,x}=v_x\!\left(f_\phi(l,x)\right)\neq\bot,
   \qquad
-  \cI_{l,x}=c(G_{l,x}).
+  I_{l,x}=c(g_{l,x}).
   \label{eq:validated_compilation}
 \end{equation}
 Here $\phi$ denotes the parser parameters. Parsing, validation, and compilation
 occur once per accepted specification; planning and runtime enforcement then
-evaluate the reusable function $\cI_{l,x}(s)$ at hypothetical or observed
+evaluate the reusable function $I_{l,x}(s)$ at hypothetical or observed
 states.
 \end{definition}
 
 The core language is deliberately small. A validated specification is a finite
 set of prohibitions,
 \begin{align}
-  G &::= \{r_1,\ldots,r_m\},
+  g &::= \{r_1,\ldots,r_m\},
   & r &::= \operatorname{prohibit}(a,\varphi), \nonumber\\
   \varphi &::= q \mid \neg\varphi \mid
   (\varphi\wedge\varphi) \mid (\varphi\vee\varphi),
@@ -826,12 +871,16 @@ unit causes $v_x$ to return $\bot$; it is not interpreted as a false condition.
 Validated fields must be total on the declared state representation. A missing
 field at evaluation time is an enforcement failure and invokes the configured
 hold or escalation behavior rather than defaulting to $\mathsf{false}$.
+The parser proposes a structured interpretation, but the validator performs
+authoritative grounding against the action vocabulary, field schema,
+enumerated values, and unit system in $x$. Ambiguous aliases are rejected; the
+LLM is not permitted to resolve them silently.
 
 For a validated specification
-$G=\{\operatorname{prohibit}(a_j,\varphi_j)\}_{j=1}^m$, Boolean conditions have
+$g=\{\operatorname{prohibit}(a_j,\varphi_j)\}_{j=1}^m$, Boolean conditions have
 their ordinary compositional semantics and the compiler is defined by
 \begin{equation}
-  c(G)(s)
+  c(g)(s)
   = \cA\setminus
     \{a_j:\operatorname{eval}_x(\varphi_j,s)=\mathsf{true}\}.
   \label{eq:compiler_semantics}
@@ -841,43 +890,51 @@ require no priority rule. The core fragment contains no positive permission
 that could override a prohibition; an extension with requirements or explicit
 permissions must declare conflict resolution before validation can succeed.
 Thus compilation produces a general rule, not a mask tied to the state observed
-during parsing. Its intersection with $\cA_0(s)$ changes the action domain but
-does not rewrite $R$ or $\cP$.
+during parsing. Its intersection with $\cA_0(s)$ defines the effective
+admissible set.
+
+The core language is memoryless and state-local. A historical or temporal
+restriction such as ``do not deploy within 30 minutes of a rollback'' or
+``allow at most three restarts per hour'' requires the relevant history to be
+represented in the Markov state---for example, by
+$\operatorname{time\_since\_rollback}$ or a rolling restart count---or a future
+extension of the specification language with temporal operators. Temporal
+syntax is outside the fragment considered here.
 
 For the cloud instruction in Example~\ref{ex:cloud}, validation may produce
 the grounded specification
 \[
- G_{l,x}=\{\operatorname{prohibit}(\operatorname{Deploy},
+ g_{l,x}=\{\operatorname{prohibit}(\operatorname{Deploy},
    \operatorname{severity}=\mathrm{Sev1})\}.
 \]
 The language, compilation, and evaluation stages then satisfy
 \begin{equation}
- v_x(f_\phi(l,x))=G_{l,x},
- \qquad
- \cI_{\mathrm{sev1}}=c(G_{l,x}),
- \qquad
- \cA_{\cI_{\mathrm{sev1}}}(s)
- =\cA_0(s)\cap\cI_{\mathrm{sev1}}(s).
+ v_x(f_\phi(l,x))=g_{l,x},
+  \qquad
+ I_{\mathrm{sev1}}=c(g_{l,x}),
+  \qquad
+ \cA_{I_{\mathrm{sev1}}}(s)
+ =\cA_0(s)\cap I_{\mathrm{sev1}}(s).
  \label{eq:cloud_compiler}
 \end{equation}
-The artifact $G_{l,x}$ denotes the general predicate in
+The artifact $g_{l,x}$ denotes the general predicate in
 Equation~\eqref{eq:cloud_intent}, not a list of actions permitted only in the
 state observed during parsing. The compiled rule can therefore be evaluated
 in a current state or in hypothetical future states considered by a
 planner. Reward optimization then trades service availability, latency,
 recovery time, and infrastructure cost among actions in
-$\cA_0(s)\cap\cI_{\mathrm{sev1}}(s)$.
+$\cA_{I_{\mathrm{sev1}}}(s)$.
 
 The parser $f_\phi$ performs semantic interpretation, not action optimization.
-The intermediate language $\mathcal G$ permits schema and consistency checks
+The intermediate language $\cG$ permits schema and consistency checks
 before the deterministic compiler $c$ produces an executable rule. The ICMDP
 optimization~\eqref{eq:icmdp_bellman} then operates over the effective
 admissible set. Thus the LLM does not enforce the constraint; the compiler
-produces $\cI(\cdot)$, while a deterministic evaluator and action filter enforce
-$\cA_\cI(s)$. The parser and compiler can also be revised independently. No LLM call is
-required inside a Bellman backup or at each decision step. The trusted
-enforcement boundary comprises the deterministic compiler and evaluator,
-active-rule store, and runtime filter, not the probabilistic language model.
+produces $I(\cdot)$, while a deterministic evaluator and action filter enforce
+$\cA_I(s)$. The parser and compiler can also be revised independently. No LLM call is
+required inside a Bellman backup or at each decision step. The composition and
+assumptions of the trusted enforcement boundary are specified in
+Section~\ref{subsec:enforcement}.
 
 \subsection{Validation and Runtime Enforcement}
 \label{subsec:enforcement}
@@ -887,14 +944,14 @@ subject to misinterpretation. Relative to the user's intended specification,
 errors can occur in two directions:
 \begin{itemize}[leftmargin=*]
   \item \textbf{Constraint over-tightening.} $f_\phi$ excludes actions the
-  user did not intend to exclude, shrinking $\cA_\cI(s)$ and increasing the
-  risk that $\cA_\cI(s) = \emptyset$ for some reachable $s$.
+  user did not intend to exclude, shrinking $\cA_I(s)$ and increasing the
+  risk that $\cA_I(s) = \emptyset$ for some reachable $s$.
   \item \textbf{Constraint under-specification.} $f_\phi$ fails to exclude
-  actions the user intended to forbid, so $\cI(s)$ is too permissive and the
+  actions the user intended to forbid, so $I(s)$ is too permissive and the
   claim of zero executed-policy mass on actions excluded by the active compiled
   specification no longer holds with
   respect to the user's actual intent, even though it still holds with respect
-  to the (incorrect) extracted $\cI(s)$.
+  to the (incorrect) compiled rule $I(s)$.
 \end{itemize}
 These are failures of \emph{specification correctness}: whether the
 compiled predicate expresses what the user meant. They are distinct from
@@ -902,51 +959,77 @@ compiled predicate expresses what the user meant. They are distinct from
 active compiled predicate to every executed action. Runtime filtering can
 establish the latter relative to a compiled rule, but cannot establish the
 former without additional evidence about interpretation and grounding.
-Either error can change the feasible policy class abruptly. The enforcement
-pipeline therefore requires at least: (i) syntax, type,
+Either error can change the policy class abruptly. The enforcement pipeline
+therefore requires at least: (i) syntax, type,
 grounding, and consistency checks on the extracted specification before it is
-compiled; (ii) an available forward-feasibility or reachability check,
+compiled; (ii) forward-feasibility checking under
+Definition~\ref{def:forward_feasibility} when a transition model and tractable
+reachability method are available,
 combined with a runtime monitor that checks
-$\cA_\cI(s_t) \neq \emptyset$ at the current state and triggers safe fallback
+$\cA_I(s_t) \neq \emptyset$ at the current state and triggers safe fallback
 or clarification behavior from Section~\ref{subsec:model} when it fails; and
 (iii) an audit trace recording,
-for each executed action $a_t$, the admissible set $\cA_\cI(s_t)$ it was
+for each executed action $a_t$, the effective admissible set $\cA_I(s_t)$ it was
 drawn from, so that compliance with the extracted intent can be verified
-after the fact. The trace records membership in $\cA_\cI(s_t)$, not a
+after the fact. The trace records membership in $\cA_I(s_t)$, not a
 statistical property of the policy. It can therefore support an audit of the
 compiled filter, but it does not show that the parsed specification matches
 the user's meaning.
 
+Raw natural-language input and LLM parser output are untrusted. The trusted
+boundary consists of the grounding and schema data, deterministic validator
+and compiler, active-rule store, relevant trusted state source, and runtime
+gate. Parser output is accepted only through the typed language; arbitrary
+model-generated code is not executed. Type and schema validation can reject
+malformed, ambiguous, or out-of-schema output, but cannot prove that a valid
+specification captures the user's intended meaning. Compromised grounding or
+state information likewise invalidates the enforcement guarantee. The
+guarantee is therefore relative to the validated compiled rule and trusted
+grounding and state inputs.
+
+Natural-language instructions and grounding context may be adversarially
+manipulated, including through prompt-injection-like inputs. Keeping the LLM
+outside the trusted enforcement boundary limits its output to candidate
+specifications that must satisfy deterministic schema, typing, and grounding
+checks. These checks do not establish semantic equivalence to the user's true
+intent; a malicious or incorrect interpretation may still be syntactically
+valid.
+
 \subsection{Dynamic Intent Update Protocol}
 \label{subsec:update_protocol}
 
-Section~\ref{subsec:extensions} distinguishes the mathematical cases
-for changing intent. Operationally, a new instruction is parsed and validated
-without modifying the active rule. The candidate rule is compiled under a new
-version, checked for current-state nonemptiness and any available forward
-feasibility condition, and then activated atomically. A failed candidate leaves
-the previous validated rule stored but does not establish that continued
-execution under that rule satisfies the user's latest instruction. If the new
-instruction could change admissibility and cannot be safely interpreted, the
-agent enters a predefined hold, clarification, or escalation state rather than
-continuing autonomous execution. The candidate is not partially installed.
+Section~\ref{subsec:extensions} distinguishes the mathematical cases for
+changing intent. Receipt of an instruction that may alter admissibility
+suspends autonomous action selection while the candidate is parsed and
+validated. The previously activated rule remains stored and unchanged for
+rollback and audit, but it is not treated as evidence of compliance with the
+newly received instruction. The candidate is compiled under a new version and
+checked for current-state nonemptiness and, when tractable, forward feasibility
+under Definition~\ref{def:forward_feasibility}. If validation and these checks
+succeed, the new rule is activated atomically. If validation fails or remains
+ambiguous, the system remains in hold, clarification, or escalation; the
+candidate is not partially installed. A less conservative continuity policy is
+application-specific and cannot claim hard compliance with an unparsed new
+instruction.
 Once activation succeeds, the runtime filter applies the
 new rule at the next action-selection boundary. Policy recomputation may then
 proceed asynchronously. This ordering separates immediate enforcement of the
 compiled update from the longer task of recovering optimal behavior under the
-new admissible domain. In the cloud example, the deployment-freeze rule
-$\cI_2$ in Equation~\eqref{eq:deployment_freeze} replaces the conditional Sev1
-rule $\cI_1$ only after this activation step; subsequent actions are filtered
-under $\cI_2$ while policy adaptation proceeds.
+new effective admissible set: activation latency ends when the new rule is
+installed, enforcement latency ends at the next governed action-selection
+boundary, and optimization latency ends when the revised proposal policy is
+available. In the cloud example, the deployment-freeze rule
+$I_2$ in Equation~\eqref{eq:deployment_freeze} replaces the conditional Sev1
+rule $I_1$ only after this activation step; subsequent actions are filtered
+under $I_2$ while policy adaptation proceeds.
 
 % -----------------------------------------------------------------------
 \section{Solution Methods and Analysis}
 \label{sec:algorithms}
 % -----------------------------------------------------------------------
 
-ICMDP is compatible with standard restricted-action solution methods: it
-changes the feasible action set rather than the reward or cost functions.
-Constraint-aware planning therefore applies the compiled predicate throughout policy evaluation,
+ICMDP is compatible with standard restricted-action solution methods.
+Constraint-aware planning applies the compiled predicate throughout policy evaluation,
 improvement, Bellman backups, and learning targets: admissibility is evaluated
 at both current and hypothetical successor states. A final runtime filter
 independently enforces the active rule on the action actually executed.
@@ -961,40 +1044,67 @@ unconstrained planner may value that action while assuming that
 $\operatorname{Deploy}$ will remain available at $s_1$. The runtime filter
 prevents deployment after $s_1$ is reached, but it does not correct the earlier
 valuation at $s_0$. Constraint-aware planning instead computes
-$V_\cI^*(s_0)$ using the restricted future set
-$\cA_\cI(s_1)$ and can prefer a trajectory with a better admissible
+$V_I^*(s_0)$ using the future effective admissible set
+$\cA_I(s_1)$ and can prefer a trajectory with a better admissible
 continuation. Runtime filtering guarantees membership of the executed action;
 it does not by itself produce a policy optimal for the restricted problem.
+
+\begin{example}[Why runtime filtering alone is insufficient]
+\label{ex:runtime_only}
+Let $\gamma=0.9$. At $s_0$, action $\operatorname{Safe}$ yields reward $5$ and
+terminates, while $\operatorname{Risky}$ yields reward $0$ and transitions to a
+Sev1 state $s_1$. At $s_1$, $\operatorname{Deploy}$ yields reward $10$ and
+terminates but is prohibited; $\operatorname{Recover}$ is admissible, yields
+reward $1$, and terminates. An unconstrained planner computes
+\[
+  Q_{\mathrm{unconstrained}}(s_0,\operatorname{Risky})
+  =0.9(10)=9>5
+\]
+and therefore selects $\operatorname{Risky}$. If a runtime-only gate masks
+$\operatorname{Deploy}$ and reselects from the remaining admissible actions,
+$\operatorname{Recover}$ is the only admissible continuation, producing return
+$0.9(1)=0.9$. By contrast,
+a constraint-aware planner uses
+\[
+  V_I(s_1)=1,
+  \qquad
+  Q_I(s_0,\operatorname{Risky})=0.9<5,
+\]
+and selects $\operatorname{Safe}$. Planner-visible admissibility and final
+runtime enforcement are therefore complementary: the gate ensures local
+compliance, while the planner avoids upstream valuations that rely on
+prohibited future actions.
+\end{example}
 
 \paragraph{Value iteration.}
 Value iteration restricts the Bellman update~\eqref{eq:icmdp_bellman}:
 \begin{equation}
-  V_{k+1}(s) = \max_{a \in \cA_\cI(s)}\left[R(s,a) + \gamma
+  V_{k+1}(s) = \max_{a \in \cA_I(s)}\left[R(s,a) + \gamma
   \sum_{s' \in \cS} \cP(s' \given s, a)\, V_k(s')\right].
   \label{eq:intent_vk}
 \end{equation}
-The restriction to $\cA_\cI(s)$ is a state-dependent action constraint applied
+The restriction to $\cA_I(s)$ is a state-dependent action constraint applied
 before the Bellman backup \citep{huang2022,lin2021actionconstrained}.
 
 \paragraph{Policy iteration.}
 Policy evaluation is unchanged but applied to an admissible policy
-$\pi \in \Pi_\cI$. Define
+$\pi \in \Pi_I$. Define
 \[
   Q^\pi(s,a)\coloneqq R(s,a)+\gamma\sum_{s'\in\cS}
   \cP(s'\given s,a)V^\pi(s').
 \]
 Policy improvement selects a deterministic admissible decision rule,
 \begin{equation}
-  \mu_{k+1}(s) \in \argmax_{a \in \cA_\cI(s)} Q^{\pi_k}(s,a)
+  \mu_{k+1}(s) \in \argmax_{a \in \cA_I(s)} Q^{\pi_k}(s,a)
   \quad \forall\, s \in \cS.
 \end{equation}
 The induced policy places unit mass on $\mu_{k+1}(s)$. For a directly specified
 admissible set, no Lagrangian relaxation is required; compliance with the
 effective admissible set follows by construction
-of $\Pi_\cI$.
+of $\Pi_I$.
 
 \paragraph{Model-free learning.}
-In model-free settings, the admissible set $\cA_\cI(s)$ can be enforced
+In model-free settings, the effective admissible set $\cA_I(s)$ can be enforced
 through action masking in Q-learning and policy-gradient algorithms
 \citep{huang2022,lin2021actionconstrained}.
 Both the behavior policy used for exploration and
@@ -1002,9 +1112,9 @@ the next-state bootstrap must be restricted to the admissible sets. For a
 sampled admissible action, the update is
 \begin{equation}
   Q(s_t,a_t) \leftarrow Q(s_t,a_t) + \alpha\!\left[r_t
-    + \gamma \max_{a' \in \cA_\cI(s_{t+1})} Q(s_{t+1},a')
+    + \gamma \max_{a' \in \cA_I(s_{t+1})} Q(s_{t+1},a')
     - Q(s_t,a_t)\right],
-  \quad a_t \in \cA_\cI(s_t),
+  \quad a_t \in \cA_I(s_t),
 \end{equation}
 where $r_t$ is the realized one-step reward sample. For policy-gradient
 methods, masked logits $z_\theta(s,a)$ yield
@@ -1012,8 +1122,8 @@ methods, masked logits $z_\theta(s,a)$ yield
   \pi_\theta(a \given s) =
   \begin{cases}
     \dfrac{\exp\bigl(z_\theta(s,a)\bigr)}
-          {\displaystyle\sum_{a' \in \cA_\cI(s)} \exp\bigl(z_\theta(s,a')\bigr)}
-    & \text{if } a \in \cA_\cI(s), \\[8pt]
+          {\displaystyle\sum_{a' \in \cA_I(s)} \exp\bigl(z_\theta(s,a')\bigr)}
+    & \text{if } a \in \cA_I(s), \\[8pt]
     0 & \text{otherwise,}
   \end{cases}
   \label{eq:masked_policy}
@@ -1025,6 +1135,11 @@ exploration uses the current-state mask, the bootstrap target uses the
 successor-state mask, and policy-gradient log-probability and entropy terms are
 computed from the masked distribution during training as well as execution.
 
+Action masking preserves the standard restricted-action formulation;
+Proposition~\ref{thm:contraction} establishes convergence only for finite-model
+value iteration. No additional convergence guarantee is claimed here for
+Q-learning or policy-gradient methods under function approximation.
+
 \subsection{Computational Cost and Failure Modes}
 \label{subsec:analysis}
 
@@ -1033,7 +1148,7 @@ Proposition~\ref{thm:contraction} gives convergence of
 \eqref{eq:intent_vk}. With an
 explicit transition model, the per-iteration backup cost is
 \[
-  O\!\left(\sum_{s\in\cS}\sum_{a\in\cA_\cI(s)}
+  O\!\left(\sum_{s\in\cS}\sum_{a\in\cA_I(s)}
   |\operatorname{supp}\cP(\cdot\given s,a)|\right),
 \]
 plus the cost of evaluating or retrieving each admissible set. Small admissible
@@ -1044,12 +1159,12 @@ deterministic predicate evaluation, filtering, and logging on the fast
 enforcement timescale. Because the LLM is outside the fast loop, its latency
 affects instruction updates rather than every Bellman backup or action.
 
-\paragraph{Empty feasible sets.}
+\paragraph{Empty admissible sets.}
 If operational availability or compiled intent leaves
-$\cA_\cI(s) = \emptyset$ for some reachable
-$s$ and~\eqref{eq:icmdp_bellman} is undefined there (Definition
+$\cA_I(s) = \emptyset$ for some reachable
+$s$, then~\eqref{eq:icmdp_bellman} is undefined there (Definition
 \ref{def:feasibility}). Any implementation must therefore include a
-feasibility monitor that checks $\cA_\cI(s_t) \neq \emptyset$ before action
+feasibility monitor that checks $\cA_I(s_t) \neq \emptyset$ before action
 selection and triggers a predefined safe fallback, termination, or user
 clarification when it fails, as described in Section~\ref{subsec:model}.
 When only local runtime feasibility is available rather than the global
@@ -1060,13 +1175,31 @@ not by itself establish a feasible continuation.
 Dynamic intent is non-stationary when the rule changes exogenously
 (Section~\ref{subsec:extensions}). The activation protocol in
 Section~\ref{subsec:update_protocol} enforces a validated replacement at the
-next action-selection boundary while planning adapts asynchronously.
+next action-selection boundary while planning adapts asynchronously. The
+resulting activation, enforcement, and optimization latencies are those defined
+in Section~\ref{subsec:extensions}; in particular, enforcement need not wait
+for optimization.
 
 \paragraph{Parser errors.}
-As detailed in Section~\ref{subsec:enforcement}, over-tightening can induce
-spurious infeasibility, whereas under-specification can cause silent
-non-compliance with the user's intent. Neither failure can be corrected by
-downstream planning alone.
+The specification and enforcement failure modes are analyzed in
+Section~\ref{subsec:enforcement}; downstream planning cannot correct a parser
+that has produced the wrong validated rule.
+
+\subsection{Planned Evaluation}
+\label{subsec:planned_evaluation}
+
+A future reproducible simulated cloud-control ICMDP evaluation will compare
+(i) unconstrained planning, (ii) finite reward penalties, (iii) a zero-budget
+CMDP using the same compiled intent exclusion, (iv) runtime filtering only,
+(v) constraint-aware planning without the final runtime gate, and (vi) combined
+constraint-aware planning and runtime enforcement. The evaluation will report
+policy return, action-level violation rate, infeasibility frequency, exact
+specification or predicate accuracy where ground truth is available, parser
+over- and under-restriction rates, clarification frequency, activation latency,
+enforcement latency, instruction-to-enforcement latency, optimization latency,
+runtime-filter overhead, and audit completeness. It will
+include clean, ambiguous, and deliberately perturbed instructions and the
+mid-execution deployment-freeze update. No empirical results are claimed here.
 
 % -----------------------------------------------------------------------
 \section{Discussion}
@@ -1077,8 +1210,8 @@ downstream planning alone.
 \label{subsec:relationship}
 
 Table~\ref{tab:comparison} summarizes the complementary representations.
-RLHF and CMDP objectives can optimize behavior within the admissible region
-$\cA_\cI(s)$, while action masking and shielding share ICMDP's per-step
+RLHF and CMDP objectives can optimize behavior within the effective admissible set
+$\cA_I(s)$, while action masking and shielding share ICMDP's per-step
 mechanism but usually rely on hand-written rules. In ICMDP, the admissibility
 function is parsed and compiled from language. Planning anticipates
 admissibility; runtime filtering enforces it at execution
@@ -1108,19 +1241,10 @@ admissibility; runtime filtering enforces it at execution
       Action-selection filter \\
     Exclusion guarantee &
       None from the reward model alone &
-      Possible for nonnegative violation cost with zero budget &
+      Possible on induced trajectories with nonnegative violation cost and
+      zero budget &
       Zero executed-policy mass on actions excluded by the active compiled
       specification \\
-    Cumulative budgets &
-      Not native &
-      Native &
-      Requires augmented state or a separate constraint mechanism \\
-    Natural-language input &
-      Preference data or language-dependent reward model &
-      Requires cost/threshold translation &
-
-      Parsed, validated, and compiled into $\cI$; intersected with
-      $\cA_0(s)$ to form $\cA_\cI(s)$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -1129,37 +1253,36 @@ admissibility; runtime filtering enforces it at execution
 \subsection{Scope and Limitations}
 \label{subsec:guarantees}
 
-Given correctly specified $\cA_0$ and $\cI$, every policy in $\Pi_\cI$ assigns
+Given correctly specified $\cA_0$ and $I$, every policy in $\Pi_I$ assigns
 zero executed-policy probability to actions excluded by the active compiled
 specification, by construction
 (Section~\ref{subsec:model}), not by statistical estimation. This statement
 depends on four assumptions from
 Section~\ref{subsec:model}: the true state (or an exact sufficient statistic)
 is observed, $\cA_0$ correctly represents operational availability,
-$\cI$ is derived correctly from the user's instruction, and the
+$I$ is derived correctly from the user's instruction, and the
 ICMDP is globally intent-feasible.
 
 For exogenous dynamic intent, the same statement is version-relative:
-after a validated rule $\cI_t$ is atomically activated, the executed policy
+after a validated rule $I_t$ is atomically activated, the executed policy
 assigns zero executed-policy probability to actions excluded by the active
 compiled specification---that is, actions outside
-$\cA_0(s)\cap\cI_t(s)$---at subsequent
+$\cA_{I_t}(s)$---at subsequent
 action-selection boundaries. This version-relative claim assumes correct activation, state
 information, predicate evaluation, and filtering. It neither applies
 retroactively nor implies that a policy awaiting reoptimization is optimal for
-the revised admissible domain.
+the revised effective admissible set.
 
 Each assumption may fail in practice:
 
 \paragraph{Parsing errors.}
-As discussed in Section~\ref{subsec:enforcement}, enforcement can guarantee
-compliance with the compiled specification but cannot establish that the
-specification correctly captures user intent. Over-tightening can cause
-spurious infeasibility, while under-specification can omit needed exclusions.
+Section~\ref{subsec:enforcement} distinguishes over- and under-specification
+and explains why enforcement of a compiled rule does not establish semantic
+agreement with user intent.
 
 \paragraph{Partial observability.} The present formulation assumes state
 observability. A belief-dependent
-admissibility function $\cI(b)$---conditioning intent on a belief state
+admissibility function $I(b)$---conditioning intent on a belief state
 rather than the true state---is left for future work.
 
 \paragraph{Scalability.} The pipeline invokes an LLM when a new instruction or
@@ -1167,6 +1290,12 @@ changed grounding requires parsing or re-validation
 (Section~\ref{subsec:extensions}). Model latency can delay such updates;
 caching and pre-compilation reduce repeated work but cannot eliminate the cost
 of interpreting a genuinely new instruction.
+
+\paragraph{Availability during updates.}
+The conservative hold-on-update protocol trades operational availability for
+assurance. A system requiring uninterrupted control may need an
+application-specific continuity policy, with correspondingly weaker claims
+about immediate compliance with an unresolved instruction.
 
 \paragraph{Absence of empirical evaluation.}
 The paper contains no quantitative comparison of policy performance, empirical
@@ -1183,22 +1312,25 @@ explanatory and has not been evaluated in a production control plane.
 This paper develops ICMDP as a formal interface between natural-language
 instructions and action admissibility in sequential decision making. Baseline
 operational availability is separated from user-imposed restriction, and their
-intersection defines the action domain used by both planning and execution.
+intersection defines the effective admissible set used by both planning and
+execution.
 The resulting model retains the standard discounted-MDP properties under fixed
 admissibility, while Proposition~\ref{prop:cmdp_encoding} locates its precise
 relationship to a zero-budget CMDP representation.
 
-The central contribution is the architecture that connects semantic
-interpretation to control: a learned parser produces a typed specification, a
-deterministic validator and compiler establish a versioned executable rule,
-planning evaluates that rule on hypothetical states, and a runtime gate applies
-it to the action actually executed. This separation makes the guarantee and its
-boundary explicit. Enforcement can provide hard exclusion under the active
-compiled rule, while specification correctness remains a distinct validation
-problem. Atomic activation further separates the time required to enforce a
-new instruction from the time required to re-optimize behavior. Together,
-these elements provide a coherent basis for agents whose linguistic
-instructions must constrain both prospective reasoning and final action.
+The central contribution is a validated and versioned
+language-to-admissibility lifecycle that connects semantic interpretation to
+control. Natural language is mapped to a validated typed specification; a
+deterministic compiler establishes an executable rule; the same rule is visible
+to planning over hypothetical states and enforced by the final runtime gate.
+The LLM remains outside the trusted boundary. Atomic version activation
+separates enforcement latency from optimization latency, allowing the new rule
+to govern execution before a proposal policy has been re-optimized. This
+separation also makes the guarantee and its boundary explicit: enforcement can
+provide hard exclusion under the active compiled rule, while specification
+correctness remains a distinct validation problem. Together, these elements
+provide a coherent basis for agents whose linguistic instructions must
+constrain both prospective reasoning and final action.
 
 % -----------------------------------------------------------------------
 %  Bibliography
