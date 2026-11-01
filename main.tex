@@ -1,16 +1,15 @@
-\documentclass[12pt]{article}
-
+%\documentclass[12pt]{article}
+\documentclass[journal]{IEEEtran}
 % -----------------------------------------------------------------------
 %  Packages
 % -----------------------------------------------------------------------
-\usepackage[margin=1in]{geometry}
+% \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{mathtools}
 \usepackage{bm}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{array}
-\usepackage{caption}
 \usepackage[section]{placeins}
 \usepackage{needspace}
 \usepackage[hidelinks]{hyperref}
@@ -60,13 +59,23 @@
 Compiling User-Specified Intent into\\
 Planning-Aware Action Admissibility}}
 
-\author{Parag Kulkarni\\[4pt]
-  \small Opus Technologies\\
-  \small \texttt{parag.kulkarni@opustechglobal.com}
-  \and
-  Baljeet Saini\\[4pt]
-  \small Tata Consultancy Services Limited\\
-  \small \texttt{Baljeet.Saini@tcs.com}
+% \author{
+%   Parag Kulkarni\\[4pt]
+%   \small Opus Technologies\\
+%   \small \texttt{parag.kulkarni@opustechglobal.com}
+%   \and
+%   Baljeet Saini\\[4pt]
+%   \small Tata Consultancy Services Limited\\
+%   \small \texttt{Baljeet.Saini@tcs.com}
+% }
+
+% Journal mode ignores \and, so the three authors are laid out in a tabular.
+\author{%
+\begin{tabular}{@{}c@{\hspace{0.06\textwidth}}c@{\hspace{0.06\textwidth}}c@{}}
+\shortstack[c]{\textbf{Parag Kulkarni}\\[2pt] Opus Technologies\\[2pt] {\small parag.kulkarni@opustechglobal.com}} &
+\shortstack[c]{\textbf{Baljeet Saini}\\[2pt] Tata Consultancy Services Limited\\[2pt] {\small Baljeet.Saini@tcs.com}} &
+\shortstack[c]{\textbf{Subhabrata Das}\\[2pt] JPMC\\[2pt] {\small subhabrata.das@chase.com}}
+\end{tabular}%
 }
 
 \date{July 2026}
@@ -111,12 +120,27 @@ AI Alignment, Safe Reinforcement Learning.
 % -----------------------------------------------------------------------
 
 Markov Decision Processes (MDPs) provide the standard model of sequential
-decision-making under uncertainty \citep{puterman1994}. Deployed agents also
+decision-making under uncertainty \cite{puterman1994}. Deployed agents also
 face partial observability, operational constraints, and instructions supplied
 through conversational interfaces. This paper focuses on the last of these:
 the translation of user-specified hard restrictions into an action-selection
 mechanism. Partial observability and cumulative resource constraints remain
 relevant boundaries, but are not the object addressed here.
+
+Machine-learning systems increasingly combine heterogeneous modeling
+strategies to address complex prediction and decision problems.
+Hybrid deep-learning approaches have been investigated for sequential
+time-series forecasting \cite{Das2025PowerOutage}, while Bayesian
+optimization and ensemble learning have been applied to high-dimensional
+classification and feature-selection problems
+\cite{Khan2024Tomato,Halder2025Landslide}. These studies illustrate the
+broader trend toward combining learned components with explicitly
+structured computational mechanisms. In agentic decision systems,
+however, predictive performance alone is insufficient when user-specified
+restrictions must be satisfied at action-selection time.
+
+Recent work increasingly treats safety and user intent as explicit constraints rather than as preferences encoded only through reward shaping. Chua et al.~\cite{chua2025nlconstraints} formulate natural-language safety requirements within a constrained Markov decision process, illustrating how language-derived constraints can support adaptation under changing safety conditions. Specification-guided reinforcement learning similarly advocates formal specifications as a more precise alternative to reward-only task definitions~\cite{Jothimurugan2025SpecRL}. In agentic settings, Zwerdling et al.~\cite{Zwerdling2025Policy} compile organizational policies into deterministic runtime guards that constrain tool use, demonstrating the practical value of separating language interpretation from enforcement. Related work on ambiguous user instructions shows that tool-using agents can behave unsafely when missing information is implicitly inferred rather than explicitly resolved, motivating clarification and validation mechanisms before execution~\cite{Wang2025LearningToAsk}. Beyond language agents, recent constrained-learning approaches for vision-language-action models further demonstrate the growing role of explicit safety constraints in sequential decision-making systems~\cite{Zhang2025SafeVLA}. These developments motivate architectures in which linguistic intent is translated into an explicit decision artifact whose semantics can be validated and whose restrictions remain visible both during planning and at execution time.
+
 
 A finite negative reward changes the relative desirability of an action
 but does not remove that action from the feasible set; if its downstream
@@ -182,13 +206,13 @@ analyses establish the formal and algorithmic setting:
 
 \paragraph{Constrained and safe decision-making.}
 The theoretical foundations of MDPs and stochastic dynamic programming are
-due to \citet{puterman1994}, with the connection to modern reinforcement
-learning (RL) algorithms established in \citet{sutton2018}. CMDPs extend MDPs
-by constraining expected cumulative costs \citep{altman1999}.
-\citet{achiam2017cpo} proposed Constrained Policy Optimization (CPO), a
+due to \cite{puterman1994}, with the connection to modern reinforcement
+learning (RL) algorithms established in \cite{sutton2018}. CMDPs extend MDPs
+by constraining expected cumulative costs \cite{altman1999}.
+\cite{achiam2017cpo} proposed Constrained Policy Optimization (CPO), a
 policy-search algorithm with guarantees for near-constraint satisfaction at
-each iteration; \citet{garcia2015} survey safe RL more broadly.
-\citet{roy2022behavior} use CMDP constraints as a direct interface for
+each iteration; \cite{garcia2015} survey safe RL more broadly.
+\cite{roy2022behavior} use CMDP constraints as a direct interface for
 specifying behavior that would otherwise be expressed through reward
 engineering. These approaches retain expected cumulative cost as the primary
 constraint representation.
@@ -196,10 +220,10 @@ constraint representation.
 \paragraph{Action masking, shielding, and state-dependent constraints.}
 A separate line of work restricts actions directly. Invalid-action masking
 removes unavailable actions before sampling or policy evaluation
-\citep{huang2022}, while action-constrained RL treats statewise feasibility as
-part of policy optimization \citep{lin2021actionconstrained}. Shielding
+\cite{huang2022}, while action-constrained RL treats statewise feasibility as
+part of policy optimization \cite{lin2021actionconstrained}. Shielding
 synthesizes an action-level intervention mechanism from temporal-logic
-specifications \citep{alshiekh2018shielding}. Specification-guided RL likewise
+specifications \cite{alshiekh2018shielding}. Specification-guided RL likewise
 studies formal specifications as an alternative to reward-only task definition
 \citep{jothimurugan2025specification}. These methods establish the importance
 of planner- or learner-visible constraints and runtime intervention, but begin
@@ -208,54 +232,156 @@ natural-language compilation pipeline.
 
 \paragraph{Language-derived objectives and constraints.}
 Preference learning and RLHF typically encode qualitative behavior in a
-learned reward model \citep{christiano2017,leike2018}. More closely related
-work translates language into explicit decision artifacts.
-\citet{chua2025nlconstraints} infer reward and constraint functions and place
-them in a CMDP for language agents. \citet{jegal2025alamp} use a staged LLM
+learned reward model \cite{christiano2017,leike2018}. More closely related
+work translates language into explicit decision artifacts infer reward and constraint functions and place
+them in a CMDP for language agents. \cite{jegal2025alamp} use a staged LLM
 pipeline to generate an MDP environment and trained policy from a free-form
-task description. \citet{winston2026solver} translate natural-language
+task description. \cite{winston2026solver} translate natural-language
 tool-use policies into SMT constraints and intercept proposed tool calls at
 runtime. The last system is particularly close to the enforcement side of the
 present architecture; its formal checks apply at the tool-call boundary,
 whereas ICMDP also exposes the same compiled rule to MDP planning over
 hypothetical successor states. In adjacent application-management work,
-\citet{dzeparoska2024policy} use LLMs to decompose intents into executable
+\cite{dzeparoska2024policy} use LLMs to decompose intents into executable
 policies and closed management loops. That systems pipeline addresses intent
 realization, whereas ICMDP centers planner-visible statewise admissibility and
 a separate hard runtime gate.
 
-\begin{table}[!t]
-  \centering
-  \caption{Positioning relative to the closest constraint and
-  language-to-policy pipelines. The planning/learning column records whether
-  the restriction can be incorporated before final execution.}
-  \label{tab:related_positioning}
-  \scriptsize
-  \setlength{\tabcolsep}{3pt}
-  \begin{tabular}{>{\raggedright\arraybackslash}p{2.35cm}
-                  >{\centering\arraybackslash}p{1.15cm}
-                  >{\raggedright\arraybackslash}p{3.05cm}
-                  >{\centering\arraybackslash}p{1.55cm}
-                  >{\centering\arraybackslash}p{1.55cm}
-                  >{\raggedright\arraybackslash}p{2.9cm}}
-    \toprule
-    Approach & NL input & Formal decision artifact & Restriction used in
-    planning or learning? &
-    Runtime gate & Update treatment \\
-    \midrule
-    Shielding \citep{alshiekh2018shielding} & No & Temporal-logic safety
-      specification & Yes, depending on integration & Yes & Specification replacement is not central \\
-    Chua et al. \citep{chua2025nlconstraints} & Yes & Learned CMDP reward and
-      constraint functions & Yes & Not central & Adaptation to changed constraints \\
-    A-LAMP \citep{jegal2025alamp} & Yes & Generated MDP, environment, and
-      trained policy & Yes & No independent gate & Not central \\
-    Winston et al. \citep{winston2026solver} & Yes & SMT constraints over
-      observable state and tool arguments & No (runtime only) & Yes & Not central \\
-    \textbf{ICMDP} & Yes & Typed statewise admissibility rule & Yes & Yes &
-      Versioned validation and atomic activation \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+% \begin{table}[!t]
+%   \centering
+%   \caption{Positioning relative to the closest constraint and
+%   language-to-policy pipelines. The planning/learning column records whether
+%   the restriction can be incorporated before final execution.}
+%   \label{tab:related_positioning}
+%   \scriptsize
+%   \setlength{\tabcolsep}{3pt}
+%   \begin{tabular}{>{\raggedright\arraybackslash}p{2.35cm}
+%                   >{\centering\arraybackslash}p{1.15cm}
+%                   >{\raggedright\arraybackslash}p{3.05cm}
+%                   >{\centering\arraybackslash}p{1.55cm}
+%                   >{\centering\arraybackslash}p{1.55cm}
+%                   >{\raggedright\arraybackslash}p{2.9cm}}
+%     \toprule
+%     Approach & NL input & Formal decision artifact & Restriction used in
+%     planning or learning? &
+%     Runtime gate & Update treatment \\
+%     \midrule
+%     Shielding \citep{alshiekh2018shielding} & No & Temporal-logic safety
+%       specification & Yes, depending on integration & Yes & Specification replacement is not central \\
+%     Chua et al. \cite{chua2025nlconstraints} & Yes & Learned CMDP reward and
+%       constraint functions & Yes & Not central & Adaptation to changed constraints \\
+%     A-LAMP \citep{jegal2025alamp} & Yes & Generated MDP, environment, and
+%       trained policy & Yes & No independent gate & Not central \\
+%     Winston et al. \cite{winston2026solver} & Yes & SMT constraints over
+%       observable state and tool arguments & No (runtime only) & Yes & Not central \\
+%     \textbf{ICMDP} & Yes & Typed statewise admissibility rule & Yes & Yes &
+%       Versioned validation and atomic activation \\
+%     \bottomrule
+%   \end{tabular}
+% \end{table}
+
+\begin{table*}[!t]
+\centering
+\caption{Positioning relative to the closest constraint and
+language-to-policy pipelines. The planning/learning column records
+whether the restriction can be incorporated before final execution.}
+\label{tab:related_positioning}
+
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+
+\begin{tabular}{
+>{\raggedright\arraybackslash}p{2.3cm}
+>{\centering\arraybackslash}p{1.4cm}
+>{\raggedright\arraybackslash}p{4.0cm}
+>{\centering\arraybackslash}p{2.2cm}
+>{\centering\arraybackslash}p{1.8cm}
+>{\raggedright\arraybackslash}p{3.2cm}
+}
+\toprule
+\textbf{Approach}
+&
+\textbf{NL input}
+&
+\textbf{Formal decision artifact}
+&
+\textbf{Restriction used in planning or learning?}
+&
+\textbf{Runtime gate}
+&
+\textbf{Update treatment}
+\\
+\midrule
+
+Shielding \cite{alshiekh2018shielding}
+&
+No
+&
+Temporal-logic safety specification
+&
+Yes, depending on integration
+&
+Yes
+&
+Specification replacement is not central
+\\
+
+Chua et al. \cite{chua2025nlconstraints}
+&
+Yes
+&
+Learned CMDP reward and constraint functions
+&
+Yes
+&
+Not central
+&
+Adaptation to changed constraints
+\\
+
+A-LAMP \cite{jegal2025alamp}
+&
+Yes
+&
+Generated MDP, environment, and trained policy
+&
+Yes
+&
+No independent gate
+&
+Not central
+\\
+
+Winston et al. \cite{winston2026solver}
+&
+Yes
+&
+SMT constraints over observable state and tool arguments
+&
+No (runtime only)
+&
+Yes
+&
+Not central
+\\
+
+\textbf{ICMDP}
+&
+Yes
+&
+Typed statewise admissibility rule
+&
+Yes
+&
+Yes
+&
+Versioned validation and atomic activation
+\\
+
+\bottomrule
+\end{tabular}
+\end{table*}
 
 \FloatBarrier
 \paragraph{Positioning of this work.}
@@ -332,10 +458,12 @@ budget, on the expected discounted cumulative cost associated with $C_k$.
 
 The CMDP optimization problem is:
 \begin{equation}
+\begin{aligned}
   \max_{\pi}\; \E_{\rho,\pi}\!\left[\sum_{t=0}^{\infty} \gamma^t R(s_t, a_t)\right]
-  \quad \text{subject to} \quad
-  \E_{\rho,\pi}\!\left[\sum_{t=0}^{\infty} \gamma^t C_k(s_t, a_t)\right] \leq d_k,
+  \quad &\text{subject to} \\
+  \E_{\rho,\pi}\!\left[\sum_{t=0}^{\infty} \gamma^t C_k(s_t, a_t)\right] &\leq d_k,
   \quad k = 1,\ldots,n.
+\end{aligned}
   \label{eq:cmdp}
 \end{equation}
 Equation~\eqref{eq:cmdp} constrains expected discounted cumulative
@@ -416,15 +544,15 @@ time rather than through a cost representation.
 Consider an autonomous agent managing a production service. A simplified state
 records incident severity, service health, CPU utilization, latency, replica
 count, and deployment status:
-\[
- s=(\text{severity},\text{health},\text{CPU},\text{latency},
-    \text{replicas},\text{deployment status},\ldots).
-\]
+\begin{align*}
+ s=(&\text{severity},\text{health},\text{CPU},\text{latency},\\
+    &\text{replicas},\text{deployment status},\ldots).
+\end{align*}
 Let the global action vocabulary be
-\[
- \cA=\{\operatorname{Deploy},\operatorname{Rollback},\operatorname{Restart},
- \operatorname{ScaleOut},\operatorname{ScaleIn},\operatorname{DoNothing}\},
-\]
+\begin{align*}
+ \cA=\{&\operatorname{Deploy},\operatorname{Rollback},\operatorname{Restart},\\
+ &\operatorname{ScaleOut},\operatorname{ScaleIn},\operatorname{DoNothing}\},
+\end{align*}
 and let $\cA_0(s)$ contain the actions operationally available in state $s$.
 For the instruction \emph{``Do not deploy while a Severity-1 production incident
 is active,''} define the stationary compiled rule
@@ -458,8 +586,8 @@ respectively,
   \Pi_I \coloneqq
   \left\{
   \pi:\cS\to\Delta(\cA)
-  \;\middle|\;
-  \pi(a \given s)=0\ \ \forall\,a\notin
+  \,\middle|\,
+  \pi(a \given s)=0\ \forall\,a\notin
   \cA_I(s),\ \forall\,s\in\cS
   \right\}.
   \label{eq:policy_class}
@@ -554,8 +682,8 @@ Bellman optimality equation}:
 \end{equation}
 with an optimal deterministic admissible decision rule selected as
 \begin{equation}
-  \mu_I^*(s) \in \argmax_{a \in \cA_I(s)}\!\left[R(s,a) + \gamma
-    \sum_{s' \in \cS} \cP(s' \given s, a)\, V_I^*(s')\right].
+  \mu_I^*(s) \in \argmax_{a \in \cA_I(s)}\bigl[R(s,a)+\gamma
+    \sum_{s' \in \cS} \cP(s' \given s, a)V_I^*(s')\bigr].
   \label{eq:icmdp_optpol}
 \end{equation}
 The induced policy is
@@ -584,12 +712,12 @@ by the framework rather than asserting a novel contraction theorem.
 
 \begin{proof}
 For bounded $V,W$, the standard maximum inequality gives
-\[
+\begin{align*}
  |(T_I V)(s)-(T_I W)(s)|
- \leq \gamma\max_{a\in\cA_I(s)}
- \sum_{s'}\cP(s'\given s,a)|V(s')-W(s')|
- \leq\gamma\lVert V-W\rVert_\infty .
-\]
+ &\leq \gamma\max_{a\in\cA_I(s)}\\
+ &\quad\sum_{s'}\cP(s'\given s,a)|V(s')-W(s')| \\
+ &\leq\gamma\lVert V-W\rVert_\infty .
+\end{align*}
 Taking the maximum over $s$ proves contraction. The remaining statements follow from
 the usual fixed-point and Bellman optimality arguments, since every admissible
 set is finite and nonempty.
@@ -686,8 +814,11 @@ validated activation to the first action-selection boundary governed by the
 new rule. \emph{Optimization latency} is the interval from validated activation
 until a revised constraint-aware proposal policy becomes available. Hence
 \begin{equation}
+\begin{aligned}
   \text{instruction-to-enforcement latency}
-  = \text{activation latency} + \text{enforcement latency}.
+  &= \text{activation latency} \\
+  &\quad + \text{enforcement latency}.
+\end{aligned}
   \label{eq:latency_decomposition}
 \end{equation}
 During the optimization interval, an older or generic proposal policy
@@ -736,50 +867,147 @@ predicate is evaluated at every action-selection boundary on a fast enforcement
 timescale. The parser and validation stages are therefore outside the agent's
 fast control loop.
 
-\begin{figure}[htbp]
+% \begin{figure}[htbp]
+%   \centering
+%   \begin{tikzpicture}[scale=1.04,transform shape,
+%       node distance=4mm,
+%       >={Latex[length=2mm]},
+%       box/.style={draw=black, rounded corners, align=center,
+%         text width=1.95cm, minimum height=9mm, font=\scriptsize},
+%       flow/.style={->, thick, draw=black},
+%       note/.style={font=\tiny, align=center}]
+%     \node[box] (user) at (0,0) {User instruction and grounding context};
+%     \node[box] (parser) at (2.5,0) {LLM parser $f_\phi$};
+%     \node[box] (spec) at (5,0) {Raw structured specification $g_{\mathrm{raw}}$};
+%     \node[box] (valid) at (7.5,0) {Deterministic validator $v_x$};
+%     \node[box] (compile) at (10,0) {Deterministic compiler $c$};
+%     \node[box] (rule) at (12.5,0) {Versioned executable rule $I^{(v)}(\cdot)$};
+%     \draw[flow] (user) -- (parser);
+%     \draw[flow] (parser) -- (spec);
+%     \draw[flow] (spec) -- (valid);
+%     \draw[flow] (valid) -- (compile);
+%     \node[note] at (8.75,-0.82) {$g_{l,x}$};
+%     \draw[flow] (compile) -- (rule);
+%     \node[note] at (6.25,1.05) {slow specification lifecycle: parse once, compile once};
+
+%     \node[box] (eval) at (6.25,-1.75) {Rule evaluation $\cA_{I^{(v)}}(s)=\cA_0(s)\cap I^{(v)}(s)$};
+%     \node[box] (plan) at (2.5,-3.5) {Constraint-aware planning or learning};
+%     \node[box] (filter) at (8.5,-3.5) {Runtime admissibility and feasibility gate};
+%     \node[box] (act) at (12,-3.5) {Executed action and environment};
+%     \node[box] (state) at (5,-5.25) {Current or hypothetical state $s$};
+%     \node[box] (audit) at (9.5,-5.25) {Versioned audit trace};
+%     \draw[flow] (rule.south) |- (eval.east);
+%     \draw[flow] (state.north) -- (eval.south);
+%     \draw[flow] (eval.west) -| (plan.north);
+%     \draw[flow] (eval.east) -| (filter.north);
+%     \draw[flow] (plan) -- node[note, above] {policy/action proposal} (filter);
+%     \draw[flow] (filter) -- (act);
+%     \draw[flow] (filter) -- (audit);
+%     \node[note] at (2.5,-4.45) {medium planning timescale};
+%     \node[note] at (12,-4.45) {fast enforcement timescale};
+%   \end{tikzpicture}
+%   \caption{Language-to-admissibility architecture. The LLM produces a raw
+%   specification outside the fast decision loop. Deterministic validation and
+%   grounding precede compilation into a versioned executable rule; planning and
+%   runtime enforcement evaluate that rule on hypothetical or current states.
+%   Executed actions and active rule versions are recorded for audit.}
+%   \label{fig:lifecycle}
+% \end{figure}
+
+\begin{figure}[!t]
   \centering
-  \begin{tikzpicture}[scale=1.04,transform shape,
+  \resizebox{\columnwidth}{!}{%
+  \begin{tikzpicture}[
       node distance=4mm,
       >={Latex[length=2mm]},
-      box/.style={draw=black, rounded corners, align=center,
-        text width=1.95cm, minimum height=9mm, font=\scriptsize},
+      box/.style={
+        draw=black,
+        rounded corners,
+        align=center,
+        text width=1.95cm,
+        minimum height=9mm,
+        font=\scriptsize
+      },
       flow/.style={->, thick, draw=black},
-      note/.style={font=\tiny, align=center}]
-    \node[box] (user) at (0,0) {User instruction and grounding context};
-    \node[box] (parser) at (2.5,0) {LLM parser $f_\phi$};
-    \node[box] (spec) at (5,0) {Raw structured specification $g_{\mathrm{raw}}$};
-    \node[box] (valid) at (7.5,0) {Deterministic validator $v_x$};
-    \node[box] (compile) at (10,0) {Deterministic compiler $c$};
-    \node[box] (rule) at (12.5,0) {Versioned executable rule $I^{(v)}(\cdot)$};
+      note/.style={font=\tiny, align=center}
+    ]
+
+    % Top row
+    \node[box] (user) at (0,0)
+      {User instruction\\and grounding\\context};
+
+    \node[box] (parser) at (2.5,0)
+      {LLM parser $f_\phi$};
+
+    \node[box] (spec) at (5,0)
+      {Raw structured\\specification\\$g_{\mathrm{raw}}$};
+
+    \node[box] (valid) at (7.5,0)
+      {Deterministic\\validator $v_x$};
+
+    \node[box] (compile) at (10,0)
+      {Deterministic\\compiler $c$};
+
+    \node[box] (rule) at (12.5,0)
+      {Versioned\\executable rule\\$I^{(v)}(\cdot)$};
+
     \draw[flow] (user) -- (parser);
     \draw[flow] (parser) -- (spec);
     \draw[flow] (spec) -- (valid);
     \draw[flow] (valid) -- (compile);
-    \node[note] at (8.75,-0.82) {$g_{l,x}$};
     \draw[flow] (compile) -- (rule);
-    \node[note] at (6.25,1.05) {slow specification lifecycle: parse once, compile once};
 
-    \node[box] (eval) at (6.25,-1.75) {Rule evaluation $\cA_{I^{(v)}}(s)=\cA_0(s)\cap I^{(v)}(s)$};
-    \node[box] (plan) at (2.5,-3.5) {Constraint-aware planning or learning};
-    \node[box] (filter) at (8.5,-3.5) {Runtime admissibility and feasibility gate};
-    \node[box] (act) at (12,-3.5) {Executed action and environment};
-    \node[box] (state) at (5,-5.25) {Current or hypothetical state $s$};
-    \node[box] (audit) at (9.5,-5.25) {Versioned audit trace};
+    \node[note] at (6.25,1.05)
+      {slow specification lifecycle: parse once, compile once};
+
+    % Middle/lower part
+    \node[box] (eval) at (6.25,-1.75)
+      {Rule evaluation\\
+       $\cA_{I^{(v)}}(s)=
+       \cA_0(s)\cap I^{(v)}(s)$};
+
+    \node[box] (plan) at (2.5,-3.5)
+      {Constraint-aware\\planning\\or learning};
+
+    \node[box] (filter) at (8.5,-3.5)
+      {Runtime admissibility\\and feasibility gate};
+
+    \node[box] (act) at (12,-3.5)
+      {Executed action\\and environment};
+
+    \node[box] (state) at (5,-5.25)
+      {Current or\\hypothetical\\state $s$};
+
+    \node[box] (audit) at (9.5,-5.25)
+      {Versioned\\audit trace};
+
     \draw[flow] (rule.south) |- (eval.east);
     \draw[flow] (state.north) -- (eval.south);
     \draw[flow] (eval.west) -| (plan.north);
     \draw[flow] (eval.east) -| (filter.north);
-    \draw[flow] (plan) -- node[note, above] {policy/action proposal} (filter);
+
+    \draw[flow] (plan) --
+      node[note, above] {policy/action proposal}
+      (filter);
+
     \draw[flow] (filter) -- (act);
     \draw[flow] (filter) -- (audit);
-    \node[note] at (2.5,-4.45) {medium planning timescale};
-    \node[note] at (12,-4.45) {fast enforcement timescale};
-  \end{tikzpicture}
+
+    \node[note] at (2.5,-4.45)
+      {medium planning timescale};
+
+    \node[note] at (12,-4.45)
+      {fast enforcement timescale};
+
+  \end{tikzpicture}%
+  }
+
   \caption{Language-to-admissibility architecture. The LLM produces a raw
   specification outside the fast decision loop. Deterministic validation and
   grounding precede compilation into a versioned executable rule; planning and
   runtime enforcement evaluate that rule on hypothetical or current states.
   Executed actions and active rule versions are recorded for audit.}
+
   \label{fig:lifecycle}
 \end{figure}
 
@@ -912,12 +1140,11 @@ the grounded specification
 \]
 The language, compilation, and evaluation stages then satisfy
 \begin{equation}
- v_x(f_\phi(l,x))=g_{l,x},
-  \qquad
- I_{\mathrm{sev1}}=c(g_{l,x}),
-  \qquad
- \cA_{I_{\mathrm{sev1}}}(s)
- =\cA_0(s)\cap I_{\mathrm{sev1}}(s).
+\begin{aligned}
+ v_x(f_\phi(l,x)) &=g_{l,x}, \\
+ I_{\mathrm{sev1}} &=c(g_{l,x}), \\
+ \cA_{I_{\mathrm{sev1}}}(s) &=\cA_0(s)\cap I_{\mathrm{sev1}}(s).
+\end{aligned}
  \label{eq:cloud_compiler}
 \end{equation}
 The artifact $g_{l,x}$ denotes the general predicate in
@@ -1114,10 +1341,12 @@ Both the behavior policy used for exploration and
 the next-state bootstrap must be restricted to the admissible sets. For a
 sampled admissible action, the update is
 \begin{equation}
-  Q(s_t,a_t) \leftarrow Q(s_t,a_t) + \alpha\!\left[r_t
-    + \gamma \max_{a' \in \cA_I(s_{t+1})} Q(s_{t+1},a')
-    - Q(s_t,a_t)\right],
-  \quad a_t \in \cA_I(s_t),
+\begin{aligned}
+  Q(s_t,a_t) &\leftarrow Q(s_t,a_t) + \alpha\Bigl[r_t \\
+    &\quad + \gamma \max_{a' \in \cA_I(s_{t+1})} Q(s_{t+1},a')
+    - Q(s_t,a_t)\Bigr], \\
+  &\quad a_t \in \cA_I(s_t),
+\end{aligned}
 \end{equation}
 where $r_t$ is the realized one-step reward sample. For policy-gradient
 methods, masked logits $z_\theta(s,a)$ yield
@@ -1220,37 +1449,64 @@ function is parsed and compiled from language. Planning anticipates
 admissibility; runtime filtering enforces it at execution
 (Section~\ref{subsec:planning}).
 
-\begin{table}[!t]
-  \centering
-  \caption{Representational comparison. Guarantees in every column are
-  conditional on the correctness of the corresponding learned or formal
-  specification and its implementation.}
-  \label{tab:comparison}
-  \small
-  \begin{tabular}{>{\raggedright\arraybackslash}p{2.5cm}
-                  >{\raggedright\arraybackslash}p{3.0cm}
-                  >{\raggedright\arraybackslash}p{3.0cm}
-                  >{\raggedright\arraybackslash}p{3.0cm}}
-    \toprule
-    Property & RLHF & CMDP & ICMDP \\
-    \midrule
-    Primary representation &
-      Learned preference reward &
-      Expected cumulative costs and thresholds &
-      Statewise admissible-action set \\
-    Enforcement point &
-      Reward optimization &
-      Policy-level feasibility constraint &
-      Action-selection filter \\
-    Exclusion guarantee &
-      None from the reward model alone &
-      Possible on induced trajectories with nonnegative violation cost and
-      zero budget &
-      Zero executed-policy mass on actions excluded by the active compiled
-      specification \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+\begin{table*}[!t]
+\centering
+\caption{Representational comparison. Guarantees in every column are
+conditional on the correctness of the corresponding learned or formal
+specification and its implementation.}
+\label{tab:comparison}
+
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+
+\begin{tabular}{
+>{\raggedright\arraybackslash}p{2.6cm}
+>{\raggedright\arraybackslash}p{4.2cm}
+>{\raggedright\arraybackslash}p{4.8cm}
+>{\raggedright\arraybackslash}p{4.8cm}
+}
+\toprule
+\textbf{Property}
+&
+\textbf{RLHF}
+&
+\textbf{CMDP}
+&
+\textbf{ICMDP}
+\\
+\midrule
+
+Primary representation
+&
+Learned preference reward
+&
+Expected cumulative costs and thresholds
+&
+Statewise admissible-action set
+\\
+
+Enforcement point
+&
+Reward optimization
+&
+Policy-level feasibility constraint
+&
+Action-selection filter
+\\
+
+Exclusion guarantee
+&
+None from the reward model alone
+&
+Possible on induced trajectories with nonnegative violation cost and zero budget
+&
+Zero executed-policy mass on actions excluded by the active compiled specification
+\\
+
+\bottomrule
+\end{tabular}
+\end{table*}
 
 \FloatBarrier
 \subsection{Scope and Limitations}
@@ -1338,7 +1594,8 @@ constrain both prospective reasoning and final action.
 % -----------------------------------------------------------------------
 %  Bibliography
 % -----------------------------------------------------------------------
-\bibliographystyle{plainnat}
+\bibliographystyle{IEEEtran}
+% \bibliographystyle{plainnat}
 \bibliography{references}
 
 \end{document}
